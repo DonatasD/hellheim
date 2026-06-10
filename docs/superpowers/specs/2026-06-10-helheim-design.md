@@ -67,6 +67,10 @@ hand limit 10 (draws beyond a full hand are forfeited). No innate healing
   draw is required and the draw pile is empty, the discard pile is shuffled in
   to form the new draw pile. The data model includes an exhaust pile, but no
   Phase 1 card uses it.
+- **Master deck vs. combat deck:** each combat operates on copies of the
+  master deck's cards. Cards created during combat (Rising Fury's copy) exist
+  only for that combat and never join the master deck; only card rewards
+  change the master deck.
 - **Targeting:** single-target Attacks require an enemy target (auto-targeted
   when only one enemy is alive); AoE and self-targeted cards take no target.
 - **Intents:** each enemy displays its next move before the player's turn —
@@ -87,7 +91,7 @@ hand limit 10 (draws beyond a full hand are forfeited). No innate healing
 | Weak | Deal ×0.75 attack damage (duration) |
 | Ritual | At end of own turn, gain N Strength |
 | Enrage | When the *player* plays a Skill, gain N Strength (enemy-only) |
-| Curl Up | First time taking attack damage, gain rolled Block, then expires |
+| Curl Up | The first time an attack deals it ≥1 damage (to Block or HP), gain the rolled Block, then the status expires. With multi-hit attacks, the first hit triggers it and later hits face the new Block |
 | Strength Down | At end of own turn, lose N Strength (implements Surge of Rage) |
 
 ### Cards — 12 designs, exact StS numbers (unupgraded)
@@ -117,15 +121,17 @@ table entry, not new logic.
 
 Intent patterns, probabilities, and no-repeat rules follow the StS wiki
 (base difficulty, Ascension 0), rolled on the seeded RNG. HP is rolled
-uniformly within range at spawn.
+uniformly within range at spawn. The probabilities below are from memory;
+**the StS wiki is authoritative** — if it disagrees, the wiki wins and the
+tests encode the wiki's numbers.
 
 | Norse name | StS original | HP | Behavior |
 |---|---|---|---|
 | Draugr Chanter | Cultist | 48–54 | Turn 1: chant (gain Ritual 3). Every turn after: attack 6 |
-| Grave Wolf | Jaw Worm | 40–44 | Turn 1: Chomp (attack 11). Then weighted random: Chomp 11 / Thrash (attack 7 + 5 Block) / Bellow (+3 Strength, +6 Block), with StS no-repeat rules |
-| Barrow Rat | Red Louse | 10–15 | Bite (attack, damage rolled 5–7 at spawn) / Grow (+3 Strength); spawns with Curl Up 3–7 |
-| Fen Rat | Green Louse | 11–17 | Bite (attack, rolled 5–7) / Diseased Spittle (apply 2 Weak); spawns with Curl Up 3–7 |
-| Forest Troll | Gremlin Nob (elite) | 82–86 | Turn 1: Bellow (gain Enrage 2). Then Rush (attack 14) / Skull Bash (attack 6, apply 2 Vulnerable) per StS pattern |
+| Grave Wolf | Jaw Worm | 40–44 | Turn 1: always Chomp (attack 11). Then 25% Chomp / 30% Thrash (attack 7 + 5 Block) / 45% Bellow (+3 Strength, +6 Block); Chomp and Bellow never repeat consecutively, Thrash at most twice in a row |
+| Barrow Rat | Red Louse | 10–15 | 75% Bite (attack, damage rolled 5–7 at spawn) / 25% Grow (+3 Strength); Bite at most twice in a row, Grow never twice in a row; spawns with Curl Up 3–7 |
+| Fen Rat | Green Louse | 11–17 | 75% Bite (attack, rolled 5–7) / 25% Diseased Spittle (apply 2 Weak); same repeat rules as Barrow Rat; spawns with Curl Up 3–7 |
+| Forest Troll | Gremlin Nob (elite) | 82–86 | Turn 1: Bellow (gain Enrage 2). Then 33% Skull Bash (attack 6, apply 2 Vulnerable) / 67% Rush (attack 14); Rush at most twice in a row |
 
 ### The gauntlet — "the Barrow Road"
 
@@ -134,8 +140,9 @@ Phase 1's stand-in for the map: a fixed three-fight sequence.
 1. **Fight 1:** Draugr Chanter *or* Grave Wolf — picked from the encounter
    pool by seeded RNG.
 2. **Card reward:** choose 1 of 3 distinct cards rolled uniformly from the
-   9-card reward pool (no duplicates within one offer; duplicates across
-   rewards allowed), or skip.
+   reward pool (no duplicates within one offer; duplicates across rewards
+   allowed), or skip. The reward pool is the 9 non-starter designs: every
+   card in the table except Hew, Raise Shield, and Skull-Splitter.
 3. **Fight 2:** Barrow Rat + Fen Rat (pair fight — exercises multi-enemy
    targeting, Weak, Curl Up).
 4. **Card reward** (same rules).
