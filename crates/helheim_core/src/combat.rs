@@ -476,6 +476,91 @@ mod tests {
         assert!(matches!(c.intent_of(0), IntentKind::Attack { damage: 13, hits: 1 })); // floor(9*1.5)
     }
 
+    fn play(c: &mut CombatState, i: usize, t: Option<usize>) -> Result<Vec<CombatEvent>, IllegalAction> {
+        let mut rng = RunRng::new(0);
+        c.apply(&mut rng, Action::PlayCard { hand_index: i, target: t })
+    }
+
+    #[test]
+    fn hew_deals_6_costs_1_and_goes_to_discard() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::Hew]);
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.enemies[0].hp, 44);
+        assert_eq!(c.player.energy, 2);
+        assert!(c.hand.is_empty());
+        assert_eq!(c.discard, vec![CardId::Hew]);
+        assert!(events.contains(&CombatEvent::CardPlayed { card: CardId::Hew, hand_index: 0 }));
+        assert!(events.contains(&CombatEvent::DamageDealt {
+            target: TargetRef::Enemy(0), amount: 6, blocked: 0, hp_lost: 6
+        }));
+        assert!(events.contains(&CombatEvent::EnergySet { energy: 2 }));
+    }
+
+    #[test]
+    fn raise_shield_gains_5_block() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::RaiseShield]);
+        let events = play(&mut c, 0, None).unwrap();
+        assert_eq!(c.player.block, 5);
+        assert!(events.contains(&CombatEvent::BlockGained { target: TargetRef::Player, amount: 5 }));
+    }
+
+    #[test]
+    fn attack_consumes_enemy_block_first() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::Hew]);
+        c.enemies[0].block = 4;
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.enemies[0].hp, 48);
+        assert!(events.contains(&CombatEvent::DamageDealt {
+            target: TargetRef::Enemy(0), amount: 6, blocked: 4, hp_lost: 2
+        }));
+    }
+
+    #[test]
+    fn not_enough_energy_is_rejected() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::SkullSplitter]);
+        c.player.energy = 1; // Skull-Splitter costs 2
+        assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::NotEnoughEnergy));
+        assert_eq!(c.hand.len(), 1); // nothing changed
+        assert_eq!(c.player.energy, 1);
+    }
+
+    #[test]
+    fn bad_hand_index_is_rejected() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![]);
+        assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::NoSuchCard));
+    }
+
+    #[test]
+    fn single_target_card_with_two_living_enemies_needs_a_target() {
+        let mut c = combat_vs(
+            vec![enemy(Species::BarrowRat, 12), enemy(Species::FenRat, 12)],
+            vec![CardId::Hew],
+        );
+        assert_eq!(play(&mut c, 0, None), Err(IllegalAction::NeedsTarget));
+    }
+
+    #[test]
+    fn single_living_enemy_is_auto_targeted() {
+        let mut c = combat_vs(
+            vec![enemy(Species::BarrowRat, 12), enemy(Species::FenRat, 12)],
+            vec![CardId::Hew],
+        );
+        c.enemies[0].hp = 0; // only the Fen Rat lives
+        play(&mut c, 0, None).unwrap();
+        assert_eq!(c.enemies[1].hp, 6);
+    }
+
+    #[test]
+    fn dead_or_out_of_range_target_is_rejected() {
+        let mut c = combat_vs(
+            vec![enemy(Species::BarrowRat, 12), enemy(Species::FenRat, 12)],
+            vec![CardId::Hew, CardId::Hew],
+        );
+        c.enemies[0].hp = 0;
+        assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::InvalidTarget));
+        assert_eq!(play(&mut c, 0, Some(9)), Err(IllegalAction::InvalidTarget));
+    }
+
     #[test]
     fn base_damage_passes_through() {
         assert_eq!(attack_damage(6, 0, false, false), 6);
