@@ -154,6 +154,9 @@ impl CombatState {
     }
 
     /// What the enemy's next move will do, with current modifiers baked in.
+    ///
+    /// # Panics
+    /// Panics if `index` is out of bounds for `enemies`.
     pub fn intent_of(&self, index: usize) -> IntentKind {
         let e = &self.enemies[index];
         let atk = |base: u32| {
@@ -275,27 +278,22 @@ impl CombatState {
             self.player.statuses.weak > 0,
             self.enemies[i].statuses.vulnerable > 0,
         );
-        // Split the borrow: extract block/hp, call soak, write back — avoids
-        // the borrow checker rejecting two &mut fields from the same Vec slot.
-        let mut block = self.enemies[i].block;
-        let mut hp = self.enemies[i].hp;
-        let out = soak(&mut block, &mut hp, dmg);
-        self.enemies[i].block = block;
-        self.enemies[i].hp = hp;
+        let e = &mut self.enemies[i];
+        let out = soak(&mut e.block, &mut e.hp, dmg);
         events.push(CombatEvent::DamageDealt {
             target: TargetRef::Enemy(i),
             amount: dmg,
             blocked: out.blocked,
             hp_lost: out.hp_lost,
         });
-        if dmg >= 1 && self.enemies[i].hp > 0 {
-            if let Some(curl) = self.enemies[i].statuses.curl_up.take() {
-                self.enemies[i].block += curl;
+        if dmg >= 1 && e.hp > 0 {
+            if let Some(curl) = e.statuses.curl_up.take() {
+                e.block += curl;
                 events.push(CombatEvent::BlockGained { target: TargetRef::Enemy(i), amount: curl });
                 events.push(CombatEvent::StatusExpired { target: TargetRef::Enemy(i), status: StatusKind::CurlUp });
             }
         }
-        if self.enemies[i].hp == 0 {
+        if e.hp == 0 {
             events.push(CombatEvent::EnemyDied { index: i });
             if self.living().next().is_none() {
                 self.over = Some(Outcome::Victory);
@@ -463,7 +461,7 @@ mod tests {
         let (b, eb) = mk();
         assert_eq!(a.hand, b.hand);
         assert_eq!(a.enemies[0].hp, b.enemies[0].hp);
-        assert_eq!(format!("{ea:?}"), format!("{eb:?}"));
+        assert_eq!(ea, eb);
     }
 
     #[test]
