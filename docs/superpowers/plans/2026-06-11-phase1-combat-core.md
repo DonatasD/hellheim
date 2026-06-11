@@ -2949,6 +2949,10 @@ git add -A && git commit -m "test(core): policy-bot gauntlet integration and det
 - Create: `crates/helheim/src/theme.rs`
 - Create: `crates/helheim/src/screens/mod.rs`
 - Create: `crates/helheim/src/screens/menu.rs`
+- Create: `crates/helheim/src/anim.rs` (stub — Task 17 replaces it)
+- Create: `crates/helheim/src/screens/combat.rs` (stub — Task 18 replaces it)
+- Create: `crates/helheim/src/screens/reward.rs` (stub — Task 19 replaces it)
+- Create: `crates/helheim/src/screens/end.rs` (stub — Task 19 replaces it)
 - Create: `crates/helheim/assets/fonts/FiraSans-Regular.ttf` (downloaded)
 
 There is no TDD loop for window code; the smoke test covers state wiring and
