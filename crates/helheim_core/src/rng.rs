@@ -1,3 +1,4 @@
+// rand 0.9 split slice helpers: `choose` is on IndexedRandom, `shuffle` on SliceRandom.
 use rand::prelude::IndexedRandom;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -25,6 +26,8 @@ impl RunRng {
         xs.shuffle(&mut self.0);
     }
 
+    /// # Panics
+    /// Panics if `xs` is empty.
     pub fn pick<T: Copy>(&mut self, xs: &[T]) -> T {
         *xs.choose(&mut self.0).expect("pick from empty slice")
     }

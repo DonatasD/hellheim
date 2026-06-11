@@ -96,6 +96,8 @@ static SPECS: [CardSpec; 12] = [
 ];
 
 impl CardId {
+    /// # Panics
+    /// Panics if the static table is missing an entry for this id (a bug).
     pub fn spec(self) -> &'static CardSpec {
         SPECS.iter().find(|s| s.id == self).expect("every CardId has a spec")
     }
@@ -190,6 +192,7 @@ mod tests {
             assert!(!REWARD_POOL.contains(&starter));
         }
         let mut unique = REWARD_POOL.to_vec();
+        unique.sort_unstable_by_key(|c| *c as usize);
         unique.dedup();
         assert_eq!(unique.len(), 9);
     }
