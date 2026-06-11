@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = ["crates/helheim_core"]
+
+# Fast dev iteration: light optimization for our code, full for dependencies.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
