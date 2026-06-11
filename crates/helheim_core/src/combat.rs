@@ -326,7 +326,6 @@ impl CombatState {
         events: &mut Vec<CombatEvent>,
     ) {
         use crate::cards::Effect;
-        let _ = &rng;
         let _ = &card;
         match effect {
             Effect::Damage(base) => {
@@ -340,7 +339,46 @@ impl CombatState {
                 self.player.block += n;
                 events.push(CombatEvent::BlockGained { target: TargetRef::Player, amount: n });
             }
-            _ => todo!("Tasks 11–12"),
+            Effect::DamageAll(base) => {
+                let targets: Vec<usize> = self.living().collect();
+                for i in targets {
+                    if self.over.is_some() {
+                        break;
+                    }
+                    if self.enemies[i].alive() {
+                        self.attack_enemy(i, base, events);
+                    }
+                }
+            }
+            Effect::ApplyVulnerable(n) => {
+                if let Some(t) = target {
+                    if self.enemies[t].alive() {
+                        self.enemies[t].statuses.vulnerable += n;
+                        events.push(CombatEvent::StatusApplied {
+                            target: TargetRef::Enemy(t),
+                            status: StatusKind::Vulnerable,
+                            amount: n as i32,
+                        });
+                    }
+                }
+            }
+            Effect::ApplyVulnerableAll(n) => {
+                let targets: Vec<usize> = self.living().collect();
+                for i in targets {
+                    self.enemies[i].statuses.vulnerable += n;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Enemy(i),
+                        status: StatusKind::Vulnerable,
+                        amount: n as i32,
+                    });
+                }
+            }
+            Effect::Draw(n) => {
+                for _ in 0..n {
+                    self.draw_one(rng, events);
+                }
+            }
+            _ => todo!("Task 12"),
         }
     }
 
@@ -511,6 +549,127 @@ mod tests {
         assert!(events.contains(&CombatEvent::DamageDealt {
             target: TargetRef::Enemy(0), amount: 6, blocked: 4, hp_lost: 2
         }));
+    }
+
+    #[test]
+    fn haft_strike_draws_a_card() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::HaftStrike]);
+        c.draw = vec![CardId::Hew];
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.hand, vec![CardId::Hew]);
+        assert!(events.contains(&CombatEvent::CardDrawn { card: CardId::Hew }));
+    }
+
+    #[test]
+    fn drawing_from_empty_pile_reshuffles_discard() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::Unbowed]);
+        c.discard = vec![CardId::Hew, CardId::RaiseShield];
+        let events = play(&mut c, 0, None).unwrap();
+        assert!(events.contains(&CombatEvent::DeckShuffled));
+        assert_eq!(c.hand.len(), 1);
+        assert_eq!(c.draw.len(), 1); // 2 reshuffled, 1 drawn
+        // Unbowed itself goes to discard AFTER resolving, so it wasn't shuffled in.
+        assert_eq!(c.discard, vec![CardId::Unbowed]);
+    }
+
+    #[test]
+    fn draws_beyond_hand_limit_are_forfeited() {
+        // A full hand at draw time is unreachable through Phase 1's card pool
+        // (playing always frees a slot first), so this is the one place we
+        // unit-test the private helper directly — same file, so tests can.
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![CardId::Hew; 10]);
+        c.draw = vec![CardId::Hew];
+        let mut rng = RunRng::new(0);
+        let mut evs = Vec::new();
+        c.draw_one(&mut rng, &mut evs);
+        assert!(evs.is_empty(), "draw at hand limit is forfeited silently");
+        assert_eq!(c.hand.len(), 10);
+        assert_eq!(c.draw.len(), 1, "the card stays on the draw pile");
+    }
+
+    #[test]
+    fn whirling_axe_hits_all_living_enemies_only() {
+        let mut c = combat_vs(
+            vec![enemy(Species::BarrowRat, 12), enemy(Species::FenRat, 12), enemy(Species::GraveWolf, 40)],
+            vec![CardId::WhirlingAxe],
+        );
+        c.enemies[1].hp = 0;
+        let events = play(&mut c, 0, None).unwrap();
+        let hits = events.iter()
+            .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
+            .count();
+        assert_eq!(hits, 2);
+        assert_eq!(c.enemies[0].hp, 4); // the fixture has no Curl Up
+        assert_eq!(c.enemies[2].hp, 32);
+    }
+
+    #[test]
+    fn twin_axes_hits_twice_and_second_hit_fizzles_on_kill() {
+        // Two enemies so the first kill doesn't end combat.
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 4), enemy(Species::GraveWolf, 40)],
+            vec![CardId::TwinAxes],
+        );
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        let hits: Vec<_> = events.iter()
+            .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
+            .collect();
+        assert_eq!(hits.len(), 1, "second hit fizzles on a corpse");
+        assert!(events.contains(&CombatEvent::EnemyDied { index: 0 }));
+        assert!(c.over.is_none());
+    }
+
+    #[test]
+    fn twin_axes_double_hits_a_survivor() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![CardId::TwinAxes]);
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        let hits = events.iter()
+            .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
+            .count();
+        assert_eq!(hits, 2);
+        assert_eq!(c.enemies[0].hp, 30);
+    }
+
+    #[test]
+    fn curl_up_triggers_once_between_hits() {
+        let mut c = combat_vs(vec![enemy(Species::BarrowRat, 20)], vec![CardId::TwinAxes]);
+        c.enemies[0].statuses.curl_up = Some(4);
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        // Hit 1: 5 damage to HP (20→15), curl up grants 4 block.
+        // Hit 2: 5 damage, 4 blocked, 1 to HP (15→14).
+        assert_eq!(c.enemies[0].hp, 14);
+        assert_eq!(c.enemies[0].block, 0);
+        assert_eq!(c.enemies[0].statuses.curl_up, None);
+        assert!(events.contains(&CombatEvent::BlockGained { target: TargetRef::Enemy(0), amount: 4 }));
+        assert!(events.contains(&CombatEvent::StatusExpired { target: TargetRef::Enemy(0), status: StatusKind::CurlUp }));
+        assert!(events.contains(&CombatEvent::DamageDealt {
+            target: TargetRef::Enemy(0), amount: 5, blocked: 4, hp_lost: 1
+        }));
+    }
+
+    #[test]
+    fn skull_splitter_applies_vulnerable_and_amplifies_followups() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
+                              vec![CardId::SkullSplitter, CardId::Hew]);
+        play(&mut c, 0, Some(0)).unwrap(); // 8 damage + Vulnerable 2
+        assert_eq!(c.enemies[0].hp, 32);
+        assert_eq!(c.enemies[0].statuses.vulnerable, 2);
+        play(&mut c, 0, Some(0)).unwrap(); // Hew: floor(6*1.5) = 9
+        assert_eq!(c.enemies[0].hp, 23);
+    }
+
+    #[test]
+    fn thors_wrath_damages_and_debuffs_all() {
+        let mut c = combat_vs(
+            vec![enemy(Species::BarrowRat, 20), enemy(Species::FenRat, 20)],
+            vec![CardId::ThorsWrath],
+        );
+        play(&mut c, 0, None).unwrap();
+        for e in &c.enemies {
+            assert_eq!(e.statuses.vulnerable, 1);
+        }
+        assert_eq!(c.enemies[0].hp, 16);
+        assert_eq!(c.enemies[1].hp, 16);
     }
 
     #[test]
