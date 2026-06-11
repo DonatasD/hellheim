@@ -2,3 +2,4 @@
 
 pub mod rng;
 pub mod cards;
+pub mod statuses;
