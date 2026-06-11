@@ -387,17 +387,19 @@ impl CombatState {
             }
             Effect::GainTempStrength(n) => {
                 self.player.statuses.strength += n;
-                self.player.statuses.strength_down += n.max(0) as u32;
                 events.push(CombatEvent::StatusApplied {
                     target: TargetRef::Player,
                     status: StatusKind::Strength,
                     amount: n,
                 });
-                events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Player,
-                    status: StatusKind::StrengthDown,
-                    amount: n,
-                });
+                if n > 0 {
+                    self.player.statuses.strength_down += n as u32;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Player,
+                        status: StatusKind::StrengthDown,
+                        amount: n,
+                    });
+                }
             }
             Effect::AddCopyToDiscard => {
                 self.discard.push(card);
@@ -608,7 +610,7 @@ mod tests {
         c.draw_one(&mut rng, &mut evs);
         assert!(evs.is_empty(), "draw at hand limit is forfeited silently");
         assert_eq!(c.hand.len(), 10);
-        assert_eq!(c.draw.len(), 1, "the card stays on the draw pile");
+        assert_eq!(c.draw, vec![CardId::Hew], "the card stays on the draw pile");
     }
 
     #[test]
@@ -772,6 +774,16 @@ mod tests {
         // Victory stops remaining effects: the kill comes first in the list.
         let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 8)], vec![CardId::SkullSplitter]);
         let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.over, Some(Outcome::Victory));
+        assert!(!events.iter().any(|e| matches!(e,
+            CombatEvent::StatusApplied { status: StatusKind::Vulnerable, .. })));
+    }
+
+    #[test]
+    fn thors_wrath_kill_skips_the_aoe_vulnerable() {
+        // DamageAll kills the last enemy: Victory stops ApplyVulnerableAll.
+        let mut c = combat_vs(vec![enemy(Species::BarrowRat, 3)], vec![CardId::ThorsWrath]);
+        let events = play(&mut c, 0, None).unwrap();
         assert_eq!(c.over, Some(Outcome::Victory));
         assert!(!events.iter().any(|e| matches!(e,
             CombatEvent::StatusApplied { status: StatusKind::Vulnerable, .. })));
