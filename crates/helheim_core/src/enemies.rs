@@ -197,7 +197,7 @@ mod tests {
     fn wolf_respects_repeat_rules_and_uses_all_moves() {
         for seed in 0..10 {
             let h = simulate(Species::GraveWolf, 300, seed);
-            assert!(max_consecutive(&h[1..], EnemyMove::Chomp) <= 1);
+            assert!(max_consecutive(&h, EnemyMove::Chomp) <= 1);
             assert!(max_consecutive(&h[1..], EnemyMove::Bellow) <= 1);
             assert!(max_consecutive(&h[1..], EnemyMove::Thrash) <= 2);
             for mv in [EnemyMove::Chomp, EnemyMove::Thrash, EnemyMove::Bellow] {

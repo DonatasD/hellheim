@@ -11,6 +11,7 @@ pub fn attack_damage(base: u32, strength: i32, attacker_weak: bool, target_vulne
     d
 }
 
+#[must_use]
 pub struct DamageOutcome {
     pub blocked: u32,
     pub hp_lost: u32,
