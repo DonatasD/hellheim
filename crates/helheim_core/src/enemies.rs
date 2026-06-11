@@ -67,6 +67,81 @@ impl EnemyMove {
     }
 }
 
+use crate::rng::RunRng;
+
+fn ran_consecutively(history: &[EnemyMove], mv: EnemyMove, times: usize) -> bool {
+    history.len() >= times && history[history.len() - times..].iter().all(|m| *m == mv)
+}
+
+/// Pick the enemy's next move per its StS pattern. Re-rolls on no-repeat
+/// violations (a legal move always exists in these rule sets).
+pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> EnemyMove {
+    let first_turn = history.is_empty();
+    match species {
+        Species::DraugrChanter => {
+            if first_turn { EnemyMove::Chant } else { EnemyMove::DarkStrike }
+        }
+        Species::GraveWolf => {
+            if first_turn {
+                return EnemyMove::Chomp;
+            }
+            loop {
+                let roll = rng.percent();
+                let candidate = if roll < 25 {
+                    EnemyMove::Chomp
+                } else if roll < 55 {
+                    EnemyMove::Thrash
+                } else {
+                    EnemyMove::Bellow
+                };
+                let ok = match candidate {
+                    EnemyMove::Chomp => !ran_consecutively(history, EnemyMove::Chomp, 1),
+                    EnemyMove::Bellow => !ran_consecutively(history, EnemyMove::Bellow, 1),
+                    EnemyMove::Thrash => !ran_consecutively(history, EnemyMove::Thrash, 2),
+                    _ => unreachable!(),
+                };
+                if ok {
+                    return candidate;
+                }
+            }
+        }
+        Species::BarrowRat | Species::FenRat => {
+            let special = if species == Species::BarrowRat {
+                EnemyMove::Grow
+            } else {
+                EnemyMove::Spittle
+            };
+            loop {
+                let candidate = if rng.percent() < 75 { EnemyMove::Bite } else { special };
+                let ok = if candidate == EnemyMove::Bite {
+                    !ran_consecutively(history, EnemyMove::Bite, 2)
+                } else {
+                    !ran_consecutively(history, special, 1)
+                };
+                if ok {
+                    return candidate;
+                }
+            }
+        }
+        Species::ForestTroll => {
+            if first_turn {
+                return EnemyMove::TrollBellow;
+            }
+            loop {
+                let candidate = if rng.percent() < 33 {
+                    EnemyMove::SkullBash
+                } else {
+                    EnemyMove::Rush
+                };
+                if candidate == EnemyMove::Rush && ran_consecutively(history, EnemyMove::Rush, 2) {
+                    continue;
+                }
+                return candidate;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +154,104 @@ mod tests {
         assert_eq!(Species::BarrowRat.hp_range(), (10, 15));
         assert_eq!(Species::FenRat.hp_range(), (11, 17));
         assert_eq!(Species::ForestTroll.hp_range(), (82, 86));
+    }
+
+    use crate::rng::RunRng;
+
+    /// Simulate `n` turns of one enemy's move history.
+    fn simulate(species: Species, n: usize, seed: u64) -> Vec<EnemyMove> {
+        let mut rng = RunRng::new(seed);
+        let mut history = Vec::new();
+        for _ in 0..n {
+            let mv = roll_move(species, &history, &mut rng);
+            history.push(mv);
+        }
+        history
+    }
+
+    fn max_consecutive(history: &[EnemyMove], mv: EnemyMove) -> usize {
+        let mut best = 0;
+        let mut cur = 0;
+        for &m in history {
+            cur = if m == mv { cur + 1 } else { 0 };
+            best = best.max(cur);
+        }
+        best
+    }
+
+    #[test]
+    fn chanter_chants_once_then_strikes_forever() {
+        let h = simulate(Species::DraugrChanter, 10, 1);
+        assert_eq!(h[0], EnemyMove::Chant);
+        assert!(h[1..].iter().all(|m| *m == EnemyMove::DarkStrike));
+    }
+
+    #[test]
+    fn wolf_always_opens_with_chomp() {
+        for seed in 0..20 {
+            assert_eq!(simulate(Species::GraveWolf, 1, seed)[0], EnemyMove::Chomp);
+        }
+    }
+
+    #[test]
+    fn wolf_respects_repeat_rules_and_uses_all_moves() {
+        for seed in 0..10 {
+            let h = simulate(Species::GraveWolf, 300, seed);
+            assert!(max_consecutive(&h[1..], EnemyMove::Chomp) <= 1);
+            assert!(max_consecutive(&h[1..], EnemyMove::Bellow) <= 1);
+            assert!(max_consecutive(&h[1..], EnemyMove::Thrash) <= 2);
+            for mv in [EnemyMove::Chomp, EnemyMove::Thrash, EnemyMove::Bellow] {
+                assert!(h.contains(&mv), "seed {seed} never rolled {mv:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn wolf_distribution_is_roughly_25_30_45() {
+        // Distribution check on raw rolls is awkward with constraints; instead
+        // assert long-run frequencies sit in generous bands.
+        let h = simulate(Species::GraveWolf, 3000, 99);
+        let count = |mv| h.iter().filter(|m| **m == mv).count() as f64 / h.len() as f64;
+        let (chomp, thrash, bellow) =
+            (count(EnemyMove::Chomp), count(EnemyMove::Thrash), count(EnemyMove::Bellow));
+        assert!((0.15..=0.40).contains(&chomp), "chomp {chomp}");
+        assert!((0.20..=0.45).contains(&thrash), "thrash {thrash}");
+        assert!((0.30..=0.60).contains(&bellow), "bellow {bellow}");
+    }
+
+    #[test]
+    fn rats_respect_repeat_rules() {
+        for (species, special) in [
+            (Species::BarrowRat, EnemyMove::Grow),
+            (Species::FenRat, EnemyMove::Spittle),
+        ] {
+            for seed in 0..10 {
+                let h = simulate(species, 300, seed);
+                assert!(max_consecutive(&h, EnemyMove::Bite) <= 2);
+                assert!(max_consecutive(&h, special) <= 1);
+                assert!(h.contains(&EnemyMove::Bite));
+                assert!(h.contains(&special));
+            }
+        }
+    }
+
+    #[test]
+    fn troll_bellows_first_then_rushes_and_bashes() {
+        for seed in 0..10 {
+            let h = simulate(Species::ForestTroll, 300, seed);
+            assert_eq!(h[0], EnemyMove::TrollBellow);
+            assert!(!h[1..].contains(&EnemyMove::TrollBellow));
+            assert!(max_consecutive(&h[1..], EnemyMove::Rush) <= 2);
+            assert!(h[1..].contains(&EnemyMove::Rush));
+            assert!(h[1..].contains(&EnemyMove::SkullBash));
+        }
+    }
+
+    #[test]
+    fn roll_move_is_deterministic_per_seed() {
+        assert_eq!(
+            simulate(Species::GraveWolf, 50, 1234),
+            simulate(Species::GraveWolf, 50, 1234)
+        );
     }
 }
