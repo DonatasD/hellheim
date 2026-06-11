@@ -33,7 +33,6 @@ impl RunRng {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::*;
 
     #[test]
     fn same_seed_same_sequence() {
