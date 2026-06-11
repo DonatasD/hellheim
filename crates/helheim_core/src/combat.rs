@@ -326,7 +326,6 @@ impl CombatState {
         events: &mut Vec<CombatEvent>,
     ) {
         use crate::cards::Effect;
-        let _ = &card;
         match effect {
             Effect::Damage(base) => {
                 if let Some(t) = target {
@@ -378,7 +377,32 @@ impl CombatState {
                     self.draw_one(rng, events);
                 }
             }
-            _ => todo!("Task 12"),
+            Effect::GainStrength(n) => {
+                self.player.statuses.strength += n;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Strength,
+                    amount: n,
+                });
+            }
+            Effect::GainTempStrength(n) => {
+                self.player.statuses.strength += n;
+                self.player.statuses.strength_down += n.max(0) as u32;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Strength,
+                    amount: n,
+                });
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::StrengthDown,
+                    amount: n,
+                });
+            }
+            Effect::AddCopyToDiscard => {
+                self.discard.push(card);
+                events.push(CombatEvent::CardAddedToDiscard { card });
+            }
         }
     }
 
@@ -670,6 +694,87 @@ mod tests {
         }
         assert_eq!(c.enemies[0].hp, 16);
         assert_eq!(c.enemies[1].hp, 16);
+    }
+
+    #[test]
+    fn surge_of_rage_gives_temporary_strength() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
+                              vec![CardId::SurgeOfRage, CardId::Hew]);
+        let events = play(&mut c, 0, None).unwrap();
+        assert_eq!(c.player.statuses.strength, 2);
+        assert_eq!(c.player.statuses.strength_down, 2);
+        assert!(events.contains(&CombatEvent::StatusApplied {
+            target: TargetRef::Player, status: StatusKind::Strength, amount: 2
+        }));
+        play(&mut c, 0, Some(0)).unwrap(); // Hew: 6+2 = 8
+        assert_eq!(c.enemies[0].hp, 32);
+    }
+
+    #[test]
+    fn berserkergang_is_consumed_and_strength_persists() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
+                              vec![CardId::Berserkergang, CardId::Hew]);
+        play(&mut c, 0, None).unwrap();
+        assert_eq!(c.player.statuses.strength, 2);
+        assert_eq!(c.player.statuses.strength_down, 0);
+        assert!(c.discard.is_empty(), "powers are consumed, not discarded");
+        play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.enemies[0].hp, 32);
+    }
+
+    #[test]
+    fn rising_fury_adds_a_copy_to_discard() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![CardId::RisingFury]);
+        let energy_before = c.player.energy;
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.player.energy, energy_before, "Rising Fury costs 0");
+        assert_eq!(c.enemies[0].hp, 34);
+        // Copy added during resolution + the played card itself.
+        assert_eq!(c.discard, vec![CardId::RisingFury, CardId::RisingFury]);
+        assert!(events.contains(&CombatEvent::CardAddedToDiscard { card: CardId::RisingFury }));
+    }
+
+    #[test]
+    fn enrage_triggers_on_skills_and_updates_intent() {
+        let mut c = combat_vs(vec![enemy(Species::ForestTroll, 84)],
+                              vec![CardId::RaiseShield, CardId::Hew]);
+        c.enemies[0].statuses.enrage = 2;
+        c.enemies[0].next_move = EnemyMove::Rush;
+        let events = play(&mut c, 0, None).unwrap(); // skill
+        assert_eq!(c.enemies[0].statuses.strength, 2);
+        assert!(events.contains(&CombatEvent::StatusApplied {
+            target: TargetRef::Enemy(0), status: StatusKind::Strength, amount: 2
+        }));
+        assert!(events.contains(&CombatEvent::IntentSet {
+            index: 0,
+            intent: IntentKind::Attack { damage: 16, hits: 1 }, // 14 + 2
+        }));
+        let events = play(&mut c, 0, Some(0)).unwrap(); // attack: no enrage
+        assert_eq!(c.enemies[0].statuses.strength, 2);
+        assert!(!events.iter().any(|e| matches!(e,
+            CombatEvent::StatusApplied { status: StatusKind::Strength, .. })));
+    }
+
+    #[test]
+    fn killing_the_last_enemy_wins_and_locks_the_combat() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 5)], vec![CardId::Hew, CardId::Hew]);
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.over, Some(Outcome::Victory));
+        assert!(events.contains(&CombatEvent::EnemyDied { index: 0 }));
+        assert!(events.contains(&CombatEvent::Victory));
+        assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::CombatOver));
+        let mut rng = RunRng::new(0);
+        assert_eq!(c.apply(&mut rng, Action::EndTurn), Err(IllegalAction::CombatOver));
+    }
+
+    #[test]
+    fn skull_splitter_kill_skips_the_vulnerable_application() {
+        // Victory stops remaining effects: the kill comes first in the list.
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 8)], vec![CardId::SkullSplitter]);
+        let events = play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.over, Some(Outcome::Victory));
+        assert!(!events.iter().any(|e| matches!(e,
+            CombatEvent::StatusApplied { status: StatusKind::Vulnerable, .. })));
     }
 
     #[test]
