@@ -408,8 +408,187 @@ impl CombatState {
         }
     }
 
-    fn end_turn(&mut self, _rng: &mut RunRng) -> Vec<CombatEvent> {
-        todo!("Task 13")
+    fn end_turn(&mut self, rng: &mut RunRng) -> Vec<CombatEvent> {
+        let mut events = Vec::new();
+
+        // 1. Discard the hand.
+        self.discard.append(&mut self.hand);
+        events.push(CombatEvent::HandDiscarded);
+
+        // 2. Player end-of-turn statuses.
+        let sd = self.player.statuses.strength_down;
+        if sd > 0 {
+            self.player.statuses.strength -= sd as i32;
+            self.player.statuses.strength_down = 0;
+            events.push(CombatEvent::StatusApplied {
+                target: TargetRef::Player,
+                status: StatusKind::Strength,
+                amount: -(sd as i32),
+            });
+            events.push(CombatEvent::StatusExpired {
+                target: TargetRef::Player,
+                status: StatusKind::StrengthDown,
+            });
+        }
+
+        // 3. Player duration tick.
+        Self::push_tick_events(TargetRef::Player, self.player.statuses.tick_durations(), &mut events);
+
+        // 4. Enemy turns, in spawn order.
+        for i in 0..self.enemies.len() {
+            if !self.enemies[i].alive() {
+                continue;
+            }
+            self.enemies[i].block = 0;
+            events.push(CombatEvent::BlockReset { target: TargetRef::Enemy(i) });
+
+            let mv = self.enemies[i].next_move;
+            events.push(CombatEvent::EnemyMoved { index: i, mv });
+            self.enemy_move(i, mv, &mut events);
+            if self.over.is_some() {
+                return events; // player died mid-round
+            }
+
+            let e = &mut self.enemies[i];
+            if e.statuses.ritual > 0 {
+                if e.statuses.ritual_fresh {
+                    e.statuses.ritual_fresh = false;
+                } else {
+                    let gain = e.statuses.ritual as i32;
+                    e.statuses.strength += gain;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Enemy(i),
+                        status: StatusKind::Strength,
+                        amount: gain,
+                    });
+                }
+            }
+            let ticks = e.statuses.tick_durations();
+            Self::push_tick_events(TargetRef::Enemy(i), ticks, &mut events);
+            self.enemies[i].history.push(mv);
+        }
+
+        // 5. Roll next moves and show intents.
+        for i in 0..self.enemies.len() {
+            if !self.enemies[i].alive() {
+                continue;
+            }
+            self.enemies[i].next_move =
+                roll_move(self.enemies[i].species, &self.enemies[i].history, rng);
+            events.push(CombatEvent::IntentSet { index: i, intent: self.intent_of(i) });
+        }
+
+        // 6. New player turn.
+        self.turn += 1;
+        self.player.block = 0;
+        events.push(CombatEvent::BlockReset { target: TargetRef::Player });
+        self.player.energy = ENERGY_PER_TURN;
+        events.push(CombatEvent::EnergySet { energy: ENERGY_PER_TURN });
+        events.push(CombatEvent::TurnStarted { turn: self.turn });
+        for _ in 0..DRAW_PER_TURN {
+            self.draw_one(rng, &mut events);
+        }
+        events
+    }
+
+    fn push_tick_events(
+        target: TargetRef,
+        ticks: Vec<(StatusKind, u32)>,
+        events: &mut Vec<CombatEvent>,
+    ) {
+        for (status, remaining) in ticks {
+            events.push(if remaining == 0 {
+                CombatEvent::StatusExpired { target, status }
+            } else {
+                CombatEvent::StatusTicked { target, status, remaining }
+            });
+        }
+    }
+
+    fn enemy_move(&mut self, i: usize, mv: EnemyMove, events: &mut Vec<CombatEvent>) {
+        match mv {
+            EnemyMove::Chant => {
+                let e = &mut self.enemies[i];
+                e.statuses.ritual += 3;
+                e.statuses.ritual_fresh = true;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i), status: StatusKind::Ritual, amount: 3,
+                });
+            }
+            EnemyMove::DarkStrike => self.enemy_attack(i, 6, events),
+            EnemyMove::Chomp => self.enemy_attack(i, 11, events),
+            EnemyMove::Thrash => {
+                self.enemy_attack(i, 7, events);
+                if self.over.is_none() {
+                    self.enemies[i].block += 5;
+                    events.push(CombatEvent::BlockGained {
+                        target: TargetRef::Enemy(i), amount: 5,
+                    });
+                }
+            }
+            EnemyMove::Bellow => {
+                let e = &mut self.enemies[i];
+                e.statuses.strength += 3;
+                e.block += 6;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i), status: StatusKind::Strength, amount: 3,
+                });
+                events.push(CombatEvent::BlockGained { target: TargetRef::Enemy(i), amount: 6 });
+            }
+            EnemyMove::Bite => {
+                let base = self.enemies[i].bite_damage;
+                self.enemy_attack(i, base, events);
+            }
+            EnemyMove::Grow => {
+                self.enemies[i].statuses.strength += 3;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i), status: StatusKind::Strength, amount: 3,
+                });
+            }
+            EnemyMove::Spittle => {
+                self.player.statuses.weak += 2;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player, status: StatusKind::Weak, amount: 2,
+                });
+            }
+            EnemyMove::TrollBellow => {
+                self.enemies[i].statuses.enrage += 2;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i), status: StatusKind::Enrage, amount: 2,
+                });
+            }
+            EnemyMove::Rush => self.enemy_attack(i, 14, events),
+            EnemyMove::SkullBash => {
+                self.enemy_attack(i, 6, events);
+                if self.over.is_none() {
+                    self.player.statuses.vulnerable += 2;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Player, status: StatusKind::Vulnerable, amount: 2,
+                    });
+                }
+            }
+        }
+    }
+
+    fn enemy_attack(&mut self, i: usize, base: u32, events: &mut Vec<CombatEvent>) {
+        let e = &self.enemies[i];
+        let dmg = attack_damage(
+            base,
+            e.statuses.strength,
+            e.statuses.weak > 0,
+            self.player.statuses.vulnerable > 0,
+        );
+        let out = soak(&mut self.player.block, &mut self.player.hp, dmg);
+        events.push(CombatEvent::DamageDealt {
+            target: TargetRef::Player,
+            amount: dmg,
+            blocked: out.blocked,
+            hp_lost: out.hp_lost,
+        });
+        if self.player.hp == 0 {
+            self.over = Some(Outcome::Defeat);
+            events.push(CombatEvent::PlayerDied);
+        }
     }
 }
 
@@ -833,6 +1012,186 @@ mod tests {
         c.enemies[0].hp = 0;
         assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::InvalidTarget));
         assert_eq!(play(&mut c, 0, Some(9)), Err(IllegalAction::InvalidTarget));
+    }
+
+    fn end_turn(c: &mut CombatState, seed: u64) -> Vec<CombatEvent> {
+        let mut rng = RunRng::new(seed);
+        c.apply(&mut rng, Action::EndTurn).unwrap()
+    }
+
+    #[test]
+    fn end_turn_discards_hand_and_refills_everything() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)],
+                              vec![CardId::Hew, CardId::RaiseShield]);
+        c.draw = starter_deck();
+        c.player.energy = 0;
+        c.player.block = 7;
+        let events = end_turn(&mut c, 1);
+        assert!(events.contains(&CombatEvent::HandDiscarded));
+        assert_eq!(c.turn, 2);
+        assert_eq!(c.player.energy, 3);
+        assert_eq!(c.player.block, 0, "player block expires at turn start");
+        assert_eq!(c.hand.len(), 5);
+        assert!(c.discard.contains(&CardId::RaiseShield));
+        assert!(events.contains(&CombatEvent::TurnStarted { turn: 2 }));
+        assert!(events.iter().any(|e| matches!(e, CombatEvent::IntentSet { .. })));
+    }
+
+    #[test]
+    fn enemy_attacks_through_block() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![]);
+        c.player.block = 4; // DarkStrike hits 6: 4 blocked, 2 HP lost
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.player.hp, 78);
+        assert!(events.contains(&CombatEvent::DamageDealt {
+            target: TargetRef::Player, amount: 6, blocked: 4, hp_lost: 2
+        }));
+        assert!(events.contains(&CombatEvent::EnemyMoved {
+            index: 0, mv: EnemyMove::DarkStrike
+        }));
+    }
+
+    #[test]
+    fn ritual_skips_its_first_turn_then_scales_6_9_12() {
+        // Fresh chanter exactly as a real fight starts.
+        let mut c = combat_vs(vec![Enemy {
+            history: vec![],
+            next_move: EnemyMove::Chant,
+            ..enemy(Species::DraugrChanter, 54)
+        }], vec![]);
+        let hp0 = c.player.hp;
+        end_turn(&mut c, 1); // chant; ritual fresh: no strength yet
+        assert_eq!(c.player.hp, hp0);
+        assert_eq!(c.enemies[0].statuses.ritual, 3);
+        assert_eq!(c.enemies[0].statuses.strength, 0);
+        end_turn(&mut c, 2); // attacks 6; then end-of-its-turn: +3
+        assert_eq!(c.player.hp, hp0 - 6);
+        assert_eq!(c.enemies[0].statuses.strength, 3);
+        end_turn(&mut c, 3); // attacks 9
+        assert_eq!(c.player.hp, hp0 - 15);
+        end_turn(&mut c, 4); // attacks 12
+        assert_eq!(c.player.hp, hp0 - 27);
+    }
+
+    #[test]
+    fn fen_rat_spittle_weakens_the_player() {
+        let mut c = combat_vs(vec![Enemy {
+            next_move: EnemyMove::Spittle,
+            ..enemy(Species::FenRat, 14)
+        }], vec![CardId::Hew]);
+        end_turn(&mut c, 1);
+        assert_eq!(c.player.statuses.weak, 2);
+        // Weak player: Hew deals floor(6*0.75) = 4.
+        play(&mut c, 0, Some(0)).unwrap();
+        assert_eq!(c.enemies[0].hp, 10);
+    }
+
+    #[test]
+    fn player_durations_tick_at_end_of_player_turn() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![]);
+        c.player.statuses.vulnerable = 2;
+        // End turn: tick 2→1 (before the enemy acts), enemy hits 6*1.5 = 9.
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.player.hp, 71);
+        assert!(events.contains(&CombatEvent::StatusTicked {
+            target: TargetRef::Player, status: StatusKind::Vulnerable, remaining: 1
+        }));
+        // Next end turn: tick 1→0, enemy hits plain 6.
+        let events = end_turn(&mut c, 2);
+        assert_eq!(c.player.hp, 65);
+        assert!(events.contains(&CombatEvent::StatusExpired {
+            target: TargetRef::Player, status: StatusKind::Vulnerable
+        }));
+    }
+
+    #[test]
+    fn enemy_durations_tick_at_end_of_its_own_turn() {
+        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![]);
+        c.enemies[0].statuses.vulnerable = 2;
+        c.enemies[0].next_move = EnemyMove::Bellow;
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.enemies[0].statuses.vulnerable, 1);
+        assert!(events.contains(&CombatEvent::StatusTicked {
+            target: TargetRef::Enemy(0), status: StatusKind::Vulnerable, remaining: 1
+        }));
+    }
+
+    #[test]
+    fn strength_down_fires_at_end_of_player_turn() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)],
+                              vec![CardId::SurgeOfRage]);
+        play(&mut c, 0, None).unwrap();
+        assert_eq!(c.player.statuses.strength, 2);
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.player.statuses.strength, 0);
+        assert_eq!(c.player.statuses.strength_down, 0);
+        assert!(events.contains(&CombatEvent::StatusApplied {
+            target: TargetRef::Player, status: StatusKind::Strength, amount: -2
+        }));
+        assert!(events.contains(&CombatEvent::StatusExpired {
+            target: TargetRef::Player, status: StatusKind::StrengthDown
+        }));
+    }
+
+    #[test]
+    fn thrash_attacks_and_blocks_and_bellow_buffs() {
+        let mut c = combat_vs(vec![Enemy {
+            next_move: EnemyMove::Thrash,
+            ..enemy(Species::GraveWolf, 40)
+        }], vec![]);
+        end_turn(&mut c, 1);
+        assert_eq!(c.player.hp, 73); // 7 damage
+        // Wolf's block was gained AFTER its block reset, so it shows 5 now.
+        assert_eq!(c.enemies[0].block, 5);
+        // Next turn the wolf's own block resets first.
+        c.enemies[0].next_move = EnemyMove::Bellow;
+        end_turn(&mut c, 2);
+        assert_eq!(c.enemies[0].block, 6, "old 5 reset, Bellow grants 6");
+        assert_eq!(c.enemies[0].statuses.strength, 3);
+    }
+
+    #[test]
+    fn troll_bellow_applies_enrage() {
+        let mut c = combat_vs(vec![Enemy {
+            history: vec![],
+            next_move: EnemyMove::TrollBellow,
+            ..enemy(Species::ForestTroll, 84)
+        }], vec![]);
+        end_turn(&mut c, 1);
+        assert_eq!(c.enemies[0].statuses.enrage, 2);
+    }
+
+    #[test]
+    fn player_death_stops_the_round_immediately() {
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50), enemy(Species::DraugrChanter, 50)],
+            vec![],
+        );
+        c.player.hp = 3; // first DarkStrike (6) kills
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.over, Some(Outcome::Defeat));
+        assert!(events.contains(&CombatEvent::PlayerDied));
+        let hits = events.iter()
+            .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
+            .count();
+        assert_eq!(hits, 1, "second enemy never acts");
+        assert!(!events.iter().any(|e| matches!(e, CombatEvent::TurnStarted { turn: 2 })));
+    }
+
+    #[test]
+    fn dead_enemies_are_skipped() {
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50), enemy(Species::DraugrChanter, 50)],
+            vec![],
+        );
+        c.enemies[0].hp = 0;
+        let events = end_turn(&mut c, 1);
+        let hits = events.iter()
+            .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
+            .count();
+        assert_eq!(hits, 1);
+        assert!(!events.iter().any(|e| matches!(e,
+            CombatEvent::IntentSet { index: 0, .. })));
     }
 
     #[test]
