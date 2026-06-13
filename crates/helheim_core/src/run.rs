@@ -21,7 +21,11 @@ pub struct RunStats {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RunError { NotInFight, NotInReward, BadIndex }
+pub enum RunError {
+    NotInFight,
+    NotInReward,
+    BadIndex,
+}
 
 /// One whole gauntlet run: master deck, carried HP, stage progression, and
 /// the single RNG stream that makes the run reproducible from its seed.
@@ -66,8 +70,13 @@ impl RunState {
             return Err(RunError::NotInFight);
         }
         let species = self.encounter(n);
-        let (combat, events) =
-            CombatState::new(&mut self.rng, &self.master_deck, self.hp, self.max_hp, &species);
+        let (combat, events) = CombatState::new(
+            &mut self.rng,
+            &self.master_deck,
+            self.hp,
+            self.max_hp,
+            &species,
+        );
         self.combat = Some(combat);
         self.track(&events);
         Ok(events)
@@ -82,12 +91,17 @@ impl RunState {
             Some(Outcome::Victory) => {
                 let combat = self.combat.take().expect("combat exists");
                 self.hp = combat.player.hp;
-                let Stage::Fight(n) = self.stage else { unreachable!("victory outside a fight") };
+                let Stage::Fight(n) = self.stage else {
+                    unreachable!("victory outside a fight")
+                };
                 if n >= 3 {
                     self.stage = Stage::Victory;
                 } else {
                     let offer = self.roll_offer();
-                    self.stage = Stage::Reward { after_fight: n, offer };
+                    self.stage = Stage::Reward {
+                        after_fight: n,
+                        offer,
+                    };
                 }
             }
             Some(Outcome::Defeat) => {
@@ -162,10 +176,16 @@ mod tests {
                             return None;
                         }
                         match spec.targeting {
-                            crate::cards::Targeting::SingleEnemy => target.map(|t| {
-                                Action::PlayCard { hand_index: i, target: Some(t) }
+                            crate::cards::Targeting::SingleEnemy => {
+                                target.map(|t| Action::PlayCard {
+                                    hand_index: i,
+                                    target: Some(t),
+                                })
+                            }
+                            _ => Some(Action::PlayCard {
+                                hand_index: i,
+                                target: None,
                             }),
-                            _ => Some(Action::PlayCard { hand_index: i, target: None }),
                         }
                     })
                     .unwrap_or(Action::EndTurn)
@@ -191,8 +211,10 @@ mod tests {
         {
             let c = run.combat.as_ref().unwrap();
             assert_eq!(c.enemies.len(), 1);
-            assert!(matches!(c.enemies[0].species,
-                Species::DraugrChanter | Species::GraveWolf));
+            assert!(matches!(
+                c.enemies[0].species,
+                Species::DraugrChanter | Species::GraveWolf
+            ));
         }
         win_current_fight(&mut run);
         run.choose_reward(None).unwrap();
@@ -205,7 +227,10 @@ mod tests {
         win_current_fight(&mut run);
         run.choose_reward(None).unwrap();
         run.begin_fight().unwrap();
-        assert_eq!(run.combat.as_ref().unwrap().enemies[0].species, Species::ForestTroll);
+        assert_eq!(
+            run.combat.as_ref().unwrap().enemies[0].species,
+            Species::ForestTroll
+        );
     }
 
     #[test]
@@ -228,7 +253,9 @@ mod tests {
         let mut run = RunState::new(11);
         run.begin_fight().unwrap();
         win_current_fight(&mut run);
-        let Stage::Reward { offer, .. } = run.stage else { panic!() };
+        let Stage::Reward { offer, .. } = run.stage else {
+            panic!()
+        };
         run.choose_reward(Some(1)).unwrap();
         assert_eq!(run.master_deck.len(), 11);
         assert_eq!(*run.master_deck.last().unwrap(), offer[1]);

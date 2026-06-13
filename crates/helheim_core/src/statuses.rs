@@ -83,7 +83,10 @@ mod tests {
         let ticked = s.tick_durations();
         assert_eq!(s.vulnerable, 1);
         assert_eq!(s.weak, 0);
-        assert_eq!(ticked, vec![(StatusKind::Vulnerable, 1), (StatusKind::Weak, 0)]);
+        assert_eq!(
+            ticked,
+            vec![(StatusKind::Vulnerable, 1), (StatusKind::Weak, 0)]
+        );
 
         let ticked = s.tick_durations();
         assert_eq!(s.vulnerable, 0);

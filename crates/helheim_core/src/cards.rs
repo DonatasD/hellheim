@@ -69,37 +69,124 @@ macro_rules! spec {
 }
 
 static SPECS: [CardSpec; 12] = [
-    spec!(Hew, "Hew", Attack, 1, SingleEnemy, &[Effect::Damage(6)], "Deal 6 damage."),
-    spec!(RaiseShield, "Raise Shield", Skill, 1, None, &[Effect::Block(5)], "Gain 5 Block."),
-    spec!(SkullSplitter, "Skull-Splitter", Attack, 2, SingleEnemy,
-          &[Effect::Damage(8), Effect::ApplyVulnerable(2)], "Deal 8 damage. Apply 2 Vulnerable."),
-    spec!(WhirlingAxe, "Whirling Axe", Attack, 1, AllEnemies,
-          &[Effect::DamageAll(8)], "Deal 8 damage to ALL enemies."),
-    spec!(HaftStrike, "Haft Strike", Attack, 1, SingleEnemy,
-          &[Effect::Damage(9), Effect::Draw(1)], "Deal 9 damage. Draw 1 card."),
-    spec!(Unbowed, "Unbowed", Skill, 1, None,
-          &[Effect::Block(8), Effect::Draw(1)], "Gain 8 Block. Draw 1 card."),
-    spec!(ShieldCharge, "Shield Charge", Attack, 1, SingleEnemy,
-          &[Effect::Damage(5), Effect::Block(5)], "Deal 5 damage. Gain 5 Block."),
-    spec!(TwinAxes, "Twin Axes", Attack, 1, SingleEnemy,
-          &[Effect::Damage(5), Effect::Damage(5)], "Deal 5 damage twice."),
-    spec!(RisingFury, "Rising Fury", Attack, 0, SingleEnemy,
-          &[Effect::Damage(6), Effect::AddCopyToDiscard],
-          "Deal 6 damage. Add a copy of this card to your discard pile."),
-    spec!(SurgeOfRage, "Surge of Rage", Skill, 0, None,
-          &[Effect::GainTempStrength(2)], "Gain 2 Strength. At the end of your turn, lose 2 Strength."),
-    spec!(Berserkergang, "Berserkergang", Power, 1, None,
-          &[Effect::GainStrength(2)], "Gain 2 Strength."),
-    spec!(ThorsWrath, "Thor's Wrath", Attack, 1, AllEnemies,
-          &[Effect::DamageAll(4), Effect::ApplyVulnerableAll(1)],
-          "Deal 4 damage to ALL enemies. Apply 1 Vulnerable to ALL enemies."),
+    spec!(
+        Hew,
+        "Hew",
+        Attack,
+        1,
+        SingleEnemy,
+        &[Effect::Damage(6)],
+        "Deal 6 damage."
+    ),
+    spec!(
+        RaiseShield,
+        "Raise Shield",
+        Skill,
+        1,
+        None,
+        &[Effect::Block(5)],
+        "Gain 5 Block."
+    ),
+    spec!(
+        SkullSplitter,
+        "Skull-Splitter",
+        Attack,
+        2,
+        SingleEnemy,
+        &[Effect::Damage(8), Effect::ApplyVulnerable(2)],
+        "Deal 8 damage. Apply 2 Vulnerable."
+    ),
+    spec!(
+        WhirlingAxe,
+        "Whirling Axe",
+        Attack,
+        1,
+        AllEnemies,
+        &[Effect::DamageAll(8)],
+        "Deal 8 damage to ALL enemies."
+    ),
+    spec!(
+        HaftStrike,
+        "Haft Strike",
+        Attack,
+        1,
+        SingleEnemy,
+        &[Effect::Damage(9), Effect::Draw(1)],
+        "Deal 9 damage. Draw 1 card."
+    ),
+    spec!(
+        Unbowed,
+        "Unbowed",
+        Skill,
+        1,
+        None,
+        &[Effect::Block(8), Effect::Draw(1)],
+        "Gain 8 Block. Draw 1 card."
+    ),
+    spec!(
+        ShieldCharge,
+        "Shield Charge",
+        Attack,
+        1,
+        SingleEnemy,
+        &[Effect::Damage(5), Effect::Block(5)],
+        "Deal 5 damage. Gain 5 Block."
+    ),
+    spec!(
+        TwinAxes,
+        "Twin Axes",
+        Attack,
+        1,
+        SingleEnemy,
+        &[Effect::Damage(5), Effect::Damage(5)],
+        "Deal 5 damage twice."
+    ),
+    spec!(
+        RisingFury,
+        "Rising Fury",
+        Attack,
+        0,
+        SingleEnemy,
+        &[Effect::Damage(6), Effect::AddCopyToDiscard],
+        "Deal 6 damage. Add a copy of this card to your discard pile."
+    ),
+    spec!(
+        SurgeOfRage,
+        "Surge of Rage",
+        Skill,
+        0,
+        None,
+        &[Effect::GainTempStrength(2)],
+        "Gain 2 Strength. At the end of your turn, lose 2 Strength."
+    ),
+    spec!(
+        Berserkergang,
+        "Berserkergang",
+        Power,
+        1,
+        None,
+        &[Effect::GainStrength(2)],
+        "Gain 2 Strength."
+    ),
+    spec!(
+        ThorsWrath,
+        "Thor's Wrath",
+        Attack,
+        1,
+        AllEnemies,
+        &[Effect::DamageAll(4), Effect::ApplyVulnerableAll(1)],
+        "Deal 4 damage to ALL enemies. Apply 1 Vulnerable to ALL enemies."
+    ),
 ];
 
 impl CardId {
     /// # Panics
     /// Panics if the static table is missing an entry for this id (a bug).
     pub fn spec(self) -> &'static CardSpec {
-        SPECS.iter().find(|s| s.id == self).expect("every CardId has a spec")
+        SPECS
+            .iter()
+            .find(|s| s.id == self)
+            .expect("every CardId has a spec")
     }
 }
 
@@ -137,7 +224,10 @@ mod tests {
 
         let bash = CardId::SkullSplitter.spec();
         assert_eq!(bash.cost, 2);
-        assert_eq!(bash.effects, &[Effect::Damage(8), Effect::ApplyVulnerable(2)]);
+        assert_eq!(
+            bash.effects,
+            &[Effect::Damage(8), Effect::ApplyVulnerable(2)]
+        );
 
         let cleave = CardId::WhirlingAxe.spec();
         assert!(matches!(cleave.targeting, Targeting::AllEnemies));
@@ -145,7 +235,10 @@ mod tests {
 
         let anger = CardId::RisingFury.spec();
         assert_eq!(anger.cost, 0);
-        assert_eq!(anger.effects, &[Effect::Damage(6), Effect::AddCopyToDiscard]);
+        assert_eq!(
+            anger.effects,
+            &[Effect::Damage(6), Effect::AddCopyToDiscard]
+        );
 
         let flex = CardId::SurgeOfRage.spec();
         assert_eq!(flex.cost, 0);
@@ -157,7 +250,10 @@ mod tests {
         assert_eq!(inflame.effects, &[Effect::GainStrength(2)]);
 
         let thunderclap = CardId::ThorsWrath.spec();
-        assert_eq!(thunderclap.effects, &[Effect::DamageAll(4), Effect::ApplyVulnerableAll(1)]);
+        assert_eq!(
+            thunderclap.effects,
+            &[Effect::DamageAll(4), Effect::ApplyVulnerableAll(1)]
+        );
 
         let twin = CardId::TwinAxes.spec();
         assert_eq!(twin.effects, &[Effect::Damage(5), Effect::Damage(5)]);
@@ -181,8 +277,14 @@ mod tests {
         let deck = starter_deck();
         assert_eq!(deck.len(), 10);
         assert_eq!(deck.iter().filter(|c| **c == CardId::Hew).count(), 5);
-        assert_eq!(deck.iter().filter(|c| **c == CardId::RaiseShield).count(), 4);
-        assert_eq!(deck.iter().filter(|c| **c == CardId::SkullSplitter).count(), 1);
+        assert_eq!(
+            deck.iter().filter(|c| **c == CardId::RaiseShield).count(),
+            4
+        );
+        assert_eq!(
+            deck.iter().filter(|c| **c == CardId::SkullSplitter).count(),
+            1
+        );
     }
 
     #[test]

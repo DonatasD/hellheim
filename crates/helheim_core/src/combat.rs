@@ -36,19 +36,34 @@ impl Enemy {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Outcome { Victory, Defeat }
+pub enum Outcome {
+    Victory,
+    Defeat,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Action {
-    PlayCard { hand_index: usize, target: Option<usize> },
+    PlayCard {
+        hand_index: usize,
+        target: Option<usize>,
+    },
     EndTurn,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum IllegalAction { CombatOver, NoSuchCard, NotEnoughEnergy, NeedsTarget, InvalidTarget }
+pub enum IllegalAction {
+    CombatOver,
+    NoSuchCard,
+    NotEnoughEnergy,
+    NeedsTarget,
+    InvalidTarget,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum TargetRef { Player, Enemy(usize) }
+pub enum TargetRef {
+    Player,
+    Enemy(usize),
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum IntentKind {
@@ -61,22 +76,62 @@ pub enum IntentKind {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CombatEvent {
-    TurnStarted { turn: u32 },
-    EnergySet { energy: u32 },
-    CardDrawn { card: CardId },
+    TurnStarted {
+        turn: u32,
+    },
+    EnergySet {
+        energy: u32,
+    },
+    CardDrawn {
+        card: CardId,
+    },
     DeckShuffled,
-    CardPlayed { card: CardId, hand_index: usize },
-    CardAddedToDiscard { card: CardId },
+    CardPlayed {
+        card: CardId,
+        hand_index: usize,
+    },
+    CardAddedToDiscard {
+        card: CardId,
+    },
     HandDiscarded,
-    BlockReset { target: TargetRef },
-    BlockGained { target: TargetRef, amount: u32 },
-    DamageDealt { target: TargetRef, amount: u32, blocked: u32, hp_lost: u32 },
-    StatusApplied { target: TargetRef, status: StatusKind, amount: i32 },
-    StatusTicked { target: TargetRef, status: StatusKind, remaining: u32 },
-    StatusExpired { target: TargetRef, status: StatusKind },
-    EnemyMoved { index: usize, mv: EnemyMove },
-    IntentSet { index: usize, intent: IntentKind },
-    EnemyDied { index: usize },
+    BlockReset {
+        target: TargetRef,
+    },
+    BlockGained {
+        target: TargetRef,
+        amount: u32,
+    },
+    DamageDealt {
+        target: TargetRef,
+        amount: u32,
+        blocked: u32,
+        hp_lost: u32,
+    },
+    StatusApplied {
+        target: TargetRef,
+        status: StatusKind,
+        amount: i32,
+    },
+    StatusTicked {
+        target: TargetRef,
+        status: StatusKind,
+        remaining: u32,
+    },
+    StatusExpired {
+        target: TargetRef,
+        status: StatusKind,
+    },
+    EnemyMoved {
+        index: usize,
+        mv: EnemyMove,
+    },
+    IntentSet {
+        index: usize,
+        intent: IntentKind,
+    },
+    EnemyDied {
+        index: usize,
+    },
     PlayerDied,
     Victory,
 }
@@ -120,7 +175,10 @@ impl CombatState {
                     hp,
                     max_hp: hp,
                     block: 0,
-                    statuses: Statuses { curl_up, ..Default::default() },
+                    statuses: Statuses {
+                        curl_up,
+                        ..Default::default()
+                    },
                     bite_damage,
                     next_move: EnemyMove::Chant, // placeholder, rolled below
                     history: Vec::new(),
@@ -129,7 +187,13 @@ impl CombatState {
             .collect();
 
         let mut state = CombatState {
-            player: Player { hp, max_hp, block: 0, energy: ENERGY_PER_TURN, statuses: Statuses::default() },
+            player: Player {
+                hp,
+                max_hp,
+                block: 0,
+                energy: ENERGY_PER_TURN,
+                statuses: Statuses::default(),
+            },
             enemies,
             draw,
             hand: Vec::new(),
@@ -142,11 +206,16 @@ impl CombatState {
         for i in 0..state.enemies.len() {
             state.enemies[i].next_move =
                 roll_move(state.enemies[i].species, &state.enemies[i].history, rng);
-            events.push(CombatEvent::IntentSet { index: i, intent: state.intent_of(i) });
+            events.push(CombatEvent::IntentSet {
+                index: i,
+                intent: state.intent_of(i),
+            });
         }
 
         events.push(CombatEvent::TurnStarted { turn: 1 });
-        events.push(CombatEvent::EnergySet { energy: ENERGY_PER_TURN });
+        events.push(CombatEvent::EnergySet {
+            energy: ENERGY_PER_TURN,
+        });
         for _ in 0..DRAW_PER_TURN {
             state.draw_one(rng, &mut events);
         }
@@ -160,15 +229,34 @@ impl CombatState {
     pub fn intent_of(&self, index: usize) -> IntentKind {
         let e = &self.enemies[index];
         let atk = |base: u32| {
-            attack_damage(base, e.statuses.strength, e.statuses.weak > 0,
-                          self.player.statuses.vulnerable > 0)
+            attack_damage(
+                base,
+                e.statuses.strength,
+                e.statuses.weak > 0,
+                self.player.statuses.vulnerable > 0,
+            )
         };
         match e.next_move {
-            EnemyMove::DarkStrike => IntentKind::Attack { damage: atk(6), hits: 1 },
-            EnemyMove::Chomp => IntentKind::Attack { damage: atk(11), hits: 1 },
-            EnemyMove::Rush => IntentKind::Attack { damage: atk(14), hits: 1 },
-            EnemyMove::SkullBash => IntentKind::Attack { damage: atk(6), hits: 1 },
-            EnemyMove::Bite => IntentKind::Attack { damage: atk(e.bite_damage), hits: 1 },
+            EnemyMove::DarkStrike => IntentKind::Attack {
+                damage: atk(6),
+                hits: 1,
+            },
+            EnemyMove::Chomp => IntentKind::Attack {
+                damage: atk(11),
+                hits: 1,
+            },
+            EnemyMove::Rush => IntentKind::Attack {
+                damage: atk(14),
+                hits: 1,
+            },
+            EnemyMove::SkullBash => IntentKind::Attack {
+                damage: atk(6),
+                hits: 1,
+            },
+            EnemyMove::Bite => IntentKind::Attack {
+                damage: atk(e.bite_damage),
+                hits: 1,
+            },
             EnemyMove::Thrash => IntentKind::AttackDefend { damage: atk(7) },
             EnemyMove::Chant | EnemyMove::Bellow | EnemyMove::Grow | EnemyMove::TrollBellow => {
                 IntentKind::Buff
@@ -252,7 +340,9 @@ impl CombatState {
         self.hand.remove(hand_index);
         self.player.energy -= spec.cost;
         events.push(CombatEvent::CardPlayed { card, hand_index });
-        events.push(CombatEvent::EnergySet { energy: self.player.energy });
+        events.push(CombatEvent::EnergySet {
+            energy: self.player.energy,
+        });
 
         for effect in spec.effects {
             if self.over.is_some() {
@@ -289,8 +379,14 @@ impl CombatState {
         if dmg >= 1 && e.hp > 0 {
             if let Some(curl) = e.statuses.curl_up.take() {
                 e.block += curl;
-                events.push(CombatEvent::BlockGained { target: TargetRef::Enemy(i), amount: curl });
-                events.push(CombatEvent::StatusExpired { target: TargetRef::Enemy(i), status: StatusKind::CurlUp });
+                events.push(CombatEvent::BlockGained {
+                    target: TargetRef::Enemy(i),
+                    amount: curl,
+                });
+                events.push(CombatEvent::StatusExpired {
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::CurlUp,
+                });
             }
         }
         if e.hp == 0 {
@@ -312,7 +408,10 @@ impl CombatState {
                     status: StatusKind::Strength,
                     amount: enrage as i32,
                 });
-                events.push(CombatEvent::IntentSet { index: i, intent: self.intent_of(i) });
+                events.push(CombatEvent::IntentSet {
+                    index: i,
+                    intent: self.intent_of(i),
+                });
             }
         }
     }
@@ -336,7 +435,10 @@ impl CombatState {
             }
             Effect::Block(n) => {
                 self.player.block += n;
-                events.push(CombatEvent::BlockGained { target: TargetRef::Player, amount: n });
+                events.push(CombatEvent::BlockGained {
+                    target: TargetRef::Player,
+                    amount: n,
+                });
             }
             Effect::DamageAll(base) => {
                 let targets: Vec<usize> = self.living().collect();
@@ -432,7 +534,11 @@ impl CombatState {
         }
 
         // 3. Player duration tick.
-        Self::push_tick_events(TargetRef::Player, self.player.statuses.tick_durations(), &mut events);
+        Self::push_tick_events(
+            TargetRef::Player,
+            self.player.statuses.tick_durations(),
+            &mut events,
+        );
 
         // 4. Enemy turns, in spawn order.
         for i in 0..self.enemies.len() {
@@ -440,7 +546,9 @@ impl CombatState {
                 continue;
             }
             self.enemies[i].block = 0;
-            events.push(CombatEvent::BlockReset { target: TargetRef::Enemy(i) });
+            events.push(CombatEvent::BlockReset {
+                target: TargetRef::Enemy(i),
+            });
 
             let mv = self.enemies[i].next_move;
             events.push(CombatEvent::EnemyMoved { index: i, mv });
@@ -475,15 +583,22 @@ impl CombatState {
             }
             self.enemies[i].next_move =
                 roll_move(self.enemies[i].species, &self.enemies[i].history, rng);
-            events.push(CombatEvent::IntentSet { index: i, intent: self.intent_of(i) });
+            events.push(CombatEvent::IntentSet {
+                index: i,
+                intent: self.intent_of(i),
+            });
         }
 
         // 6. New player turn.
         self.turn += 1;
         self.player.block = 0;
-        events.push(CombatEvent::BlockReset { target: TargetRef::Player });
+        events.push(CombatEvent::BlockReset {
+            target: TargetRef::Player,
+        });
         self.player.energy = ENERGY_PER_TURN;
-        events.push(CombatEvent::EnergySet { energy: ENERGY_PER_TURN });
+        events.push(CombatEvent::EnergySet {
+            energy: ENERGY_PER_TURN,
+        });
         events.push(CombatEvent::TurnStarted { turn: self.turn });
         for _ in 0..DRAW_PER_TURN {
             self.draw_one(rng, &mut events);
@@ -500,7 +615,11 @@ impl CombatState {
             events.push(if remaining == 0 {
                 CombatEvent::StatusExpired { target, status }
             } else {
-                CombatEvent::StatusTicked { target, status, remaining }
+                CombatEvent::StatusTicked {
+                    target,
+                    status,
+                    remaining,
+                }
             });
         }
     }
@@ -512,7 +631,9 @@ impl CombatState {
                 e.statuses.ritual += 3;
                 e.statuses.ritual_fresh = true;
                 events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Enemy(i), status: StatusKind::Ritual, amount: 3,
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Ritual,
+                    amount: 3,
                 });
             }
             EnemyMove::DarkStrike => self.enemy_attack(i, 6, events),
@@ -522,7 +643,8 @@ impl CombatState {
                 if self.over.is_none() {
                     self.enemies[i].block += 5;
                     events.push(CombatEvent::BlockGained {
-                        target: TargetRef::Enemy(i), amount: 5,
+                        target: TargetRef::Enemy(i),
+                        amount: 5,
                     });
                 }
             }
@@ -531,9 +653,14 @@ impl CombatState {
                 e.statuses.strength += 3;
                 e.block += 6;
                 events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Enemy(i), status: StatusKind::Strength, amount: 3,
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Strength,
+                    amount: 3,
                 });
-                events.push(CombatEvent::BlockGained { target: TargetRef::Enemy(i), amount: 6 });
+                events.push(CombatEvent::BlockGained {
+                    target: TargetRef::Enemy(i),
+                    amount: 6,
+                });
             }
             EnemyMove::Bite => {
                 let base = self.enemies[i].bite_damage;
@@ -542,19 +669,25 @@ impl CombatState {
             EnemyMove::Grow => {
                 self.enemies[i].statuses.strength += 3;
                 events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Enemy(i), status: StatusKind::Strength, amount: 3,
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Strength,
+                    amount: 3,
                 });
             }
             EnemyMove::Spittle => {
                 self.player.statuses.weak += 2;
                 events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Player, status: StatusKind::Weak, amount: 2,
+                    target: TargetRef::Player,
+                    status: StatusKind::Weak,
+                    amount: 2,
                 });
             }
             EnemyMove::TrollBellow => {
                 self.enemies[i].statuses.enrage += 2;
                 events.push(CombatEvent::StatusApplied {
-                    target: TargetRef::Enemy(i), status: StatusKind::Enrage, amount: 2,
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Enrage,
+                    amount: 2,
                 });
             }
             EnemyMove::Rush => self.enemy_attack(i, 14, events),
@@ -563,7 +696,9 @@ impl CombatState {
                 if self.over.is_none() {
                     self.player.statuses.vulnerable += 2;
                     events.push(CombatEvent::StatusApplied {
-                        target: TargetRef::Player, status: StatusKind::Vulnerable, amount: 2,
+                        target: TargetRef::Player,
+                        status: StatusKind::Vulnerable,
+                        amount: 2,
                     });
                 }
             }
@@ -594,7 +729,12 @@ impl CombatState {
 
 /// StS damage pipeline, integer math (truncating division == floor here):
 /// strength adds to base, Weak multiplies ×0.75, Vulnerable ×1.5.
-pub fn attack_damage(base: u32, strength: i32, attacker_weak: bool, target_vulnerable: bool) -> u32 {
+pub fn attack_damage(
+    base: u32,
+    strength: i32,
+    attacker_weak: bool,
+    target_vulnerable: bool,
+) -> u32 {
     let mut d = (base as i32 + strength).max(0) as u32;
     if attacker_weak {
         d = d * 3 / 4;
@@ -645,7 +785,13 @@ mod tests {
 
     pub fn combat_vs(enemies: Vec<Enemy>, hand: Vec<CardId>) -> CombatState {
         CombatState {
-            player: Player { hp: 80, max_hp: 80, block: 0, energy: 3, statuses: Statuses::default() },
+            player: Player {
+                hp: 80,
+                max_hp: 80,
+                block: 0,
+                energy: 3,
+                statuses: Statuses::default(),
+            },
             enemies,
             draw: vec![],
             hand,
@@ -657,31 +803,48 @@ mod tests {
     }
 
     fn count_drawn(events: &[CombatEvent]) -> usize {
-        events.iter().filter(|e| matches!(e, CombatEvent::CardDrawn { .. })).count()
+        events
+            .iter()
+            .filter(|e| matches!(e, CombatEvent::CardDrawn { .. }))
+            .count()
     }
 
     #[test]
     fn new_combat_opens_with_5_cards_3_energy_and_intents() {
         let mut rng = RunRng::new(11);
-        let (c, events) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        let (c, events) =
+            CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
         assert_eq!(c.hand.len(), 5);
         assert_eq!(c.draw.len(), 5);
         assert_eq!(c.player.energy, 3);
         assert_eq!(c.turn, 1);
         assert!(c.over.is_none());
         assert_eq!(count_drawn(&events), 5);
-        assert!(events.iter().any(|e| matches!(e, CombatEvent::TurnStarted { turn: 1 })));
-        assert!(events.iter().any(|e| matches!(e, CombatEvent::IntentSet { index: 0, .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::TurnStarted { turn: 1 })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::IntentSet { index: 0, .. })));
         // Wolf always opens with Chomp: base 11.
         assert_eq!(c.enemies[0].next_move, EnemyMove::Chomp);
-        assert!(matches!(c.intent_of(0), IntentKind::Attack { damage: 11, hits: 1 }));
+        assert!(matches!(
+            c.intent_of(0),
+            IntentKind::Attack {
+                damage: 11,
+                hits: 1
+            }
+        ));
     }
 
     #[test]
     fn new_combat_rolls_hp_in_species_range() {
         let mut rng = RunRng::new(5);
         let (c, _) = CombatState::new(
-            &mut rng, &starter_deck(), 80, 80,
+            &mut rng,
+            &starter_deck(),
+            80,
+            80,
             &[Species::BarrowRat, Species::FenRat],
         );
         let (lo0, hi0) = Species::BarrowRat.hp_range();
@@ -710,16 +873,38 @@ mod tests {
     #[test]
     fn intent_reflects_enemy_strength_and_player_vulnerable() {
         let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![]);
-        assert!(matches!(c.intent_of(0), IntentKind::Attack { damage: 6, hits: 1 }));
+        assert!(matches!(
+            c.intent_of(0),
+            IntentKind::Attack { damage: 6, hits: 1 }
+        ));
         c.enemies[0].statuses.strength = 3;
-        assert!(matches!(c.intent_of(0), IntentKind::Attack { damage: 9, hits: 1 }));
+        assert!(matches!(
+            c.intent_of(0),
+            IntentKind::Attack { damage: 9, hits: 1 }
+        ));
         c.player.statuses.vulnerable = 1;
-        assert!(matches!(c.intent_of(0), IntentKind::Attack { damage: 13, hits: 1 })); // floor(9*1.5)
+        assert!(matches!(
+            c.intent_of(0),
+            IntentKind::Attack {
+                damage: 13,
+                hits: 1
+            }
+        )); // floor(9*1.5)
     }
 
-    fn play(c: &mut CombatState, i: usize, t: Option<usize>) -> Result<Vec<CombatEvent>, IllegalAction> {
+    fn play(
+        c: &mut CombatState,
+        i: usize,
+        t: Option<usize>,
+    ) -> Result<Vec<CombatEvent>, IllegalAction> {
         let mut rng = RunRng::new(0);
-        c.apply(&mut rng, Action::PlayCard { hand_index: i, target: t })
+        c.apply(
+            &mut rng,
+            Action::PlayCard {
+                hand_index: i,
+                target: t,
+            },
+        )
     }
 
     #[test]
@@ -730,19 +915,31 @@ mod tests {
         assert_eq!(c.player.energy, 2);
         assert!(c.hand.is_empty());
         assert_eq!(c.discard, vec![CardId::Hew]);
-        assert!(events.contains(&CombatEvent::CardPlayed { card: CardId::Hew, hand_index: 0 }));
+        assert!(events.contains(&CombatEvent::CardPlayed {
+            card: CardId::Hew,
+            hand_index: 0
+        }));
         assert!(events.contains(&CombatEvent::DamageDealt {
-            target: TargetRef::Enemy(0), amount: 6, blocked: 0, hp_lost: 6
+            target: TargetRef::Enemy(0),
+            amount: 6,
+            blocked: 0,
+            hp_lost: 6
         }));
         assert!(events.contains(&CombatEvent::EnergySet { energy: 2 }));
     }
 
     #[test]
     fn raise_shield_gains_5_block() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::RaiseShield]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::RaiseShield],
+        );
         let events = play(&mut c, 0, None).unwrap();
         assert_eq!(c.player.block, 5);
-        assert!(events.contains(&CombatEvent::BlockGained { target: TargetRef::Player, amount: 5 }));
+        assert!(events.contains(&CombatEvent::BlockGained {
+            target: TargetRef::Player,
+            amount: 5
+        }));
     }
 
     #[test]
@@ -752,13 +949,19 @@ mod tests {
         let events = play(&mut c, 0, Some(0)).unwrap();
         assert_eq!(c.enemies[0].hp, 48);
         assert!(events.contains(&CombatEvent::DamageDealt {
-            target: TargetRef::Enemy(0), amount: 6, blocked: 4, hp_lost: 2
+            target: TargetRef::Enemy(0),
+            amount: 6,
+            blocked: 4,
+            hp_lost: 2
         }));
     }
 
     #[test]
     fn haft_strike_draws_a_card() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::HaftStrike]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::HaftStrike],
+        );
         c.draw = vec![CardId::Hew];
         let events = play(&mut c, 0, Some(0)).unwrap();
         assert_eq!(c.hand, vec![CardId::Hew]);
@@ -767,13 +970,16 @@ mod tests {
 
     #[test]
     fn drawing_from_empty_pile_reshuffles_discard() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::Unbowed]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::Unbowed],
+        );
         c.discard = vec![CardId::Hew, CardId::RaiseShield];
         let events = play(&mut c, 0, None).unwrap();
         assert!(events.contains(&CombatEvent::DeckShuffled));
         assert_eq!(c.hand.len(), 1);
         assert_eq!(c.draw.len(), 1); // 2 reshuffled, 1 drawn
-        // Unbowed itself goes to discard AFTER resolving, so it wasn't shuffled in.
+                                     // Unbowed itself goes to discard AFTER resolving, so it wasn't shuffled in.
         assert_eq!(c.discard, vec![CardId::Unbowed]);
     }
 
@@ -795,12 +1001,17 @@ mod tests {
     #[test]
     fn whirling_axe_hits_all_living_enemies_only() {
         let mut c = combat_vs(
-            vec![enemy(Species::BarrowRat, 12), enemy(Species::FenRat, 12), enemy(Species::GraveWolf, 40)],
+            vec![
+                enemy(Species::BarrowRat, 12),
+                enemy(Species::FenRat, 12),
+                enemy(Species::GraveWolf, 40),
+            ],
             vec![CardId::WhirlingAxe],
         );
         c.enemies[1].hp = 0;
         let events = play(&mut c, 0, None).unwrap();
-        let hits = events.iter()
+        let hits = events
+            .iter()
             .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
             .count();
         assert_eq!(hits, 2);
@@ -812,11 +1023,15 @@ mod tests {
     fn twin_axes_hits_twice_and_second_hit_fizzles_on_kill() {
         // Two enemies so the first kill doesn't end combat.
         let mut c = combat_vs(
-            vec![enemy(Species::DraugrChanter, 4), enemy(Species::GraveWolf, 40)],
+            vec![
+                enemy(Species::DraugrChanter, 4),
+                enemy(Species::GraveWolf, 40),
+            ],
             vec![CardId::TwinAxes],
         );
         let events = play(&mut c, 0, Some(0)).unwrap();
-        let hits: Vec<_> = events.iter()
+        let hits: Vec<_> = events
+            .iter()
             .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
             .collect();
         assert_eq!(hits.len(), 1, "second hit fizzles on a corpse");
@@ -828,7 +1043,8 @@ mod tests {
     fn twin_axes_double_hits_a_survivor() {
         let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![CardId::TwinAxes]);
         let events = play(&mut c, 0, Some(0)).unwrap();
-        let hits = events.iter()
+        let hits = events
+            .iter()
             .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
             .count();
         assert_eq!(hits, 2);
@@ -845,17 +1061,28 @@ mod tests {
         assert_eq!(c.enemies[0].hp, 14);
         assert_eq!(c.enemies[0].block, 0);
         assert_eq!(c.enemies[0].statuses.curl_up, None);
-        assert!(events.contains(&CombatEvent::BlockGained { target: TargetRef::Enemy(0), amount: 4 }));
-        assert!(events.contains(&CombatEvent::StatusExpired { target: TargetRef::Enemy(0), status: StatusKind::CurlUp }));
+        assert!(events.contains(&CombatEvent::BlockGained {
+            target: TargetRef::Enemy(0),
+            amount: 4
+        }));
+        assert!(events.contains(&CombatEvent::StatusExpired {
+            target: TargetRef::Enemy(0),
+            status: StatusKind::CurlUp
+        }));
         assert!(events.contains(&CombatEvent::DamageDealt {
-            target: TargetRef::Enemy(0), amount: 5, blocked: 4, hp_lost: 1
+            target: TargetRef::Enemy(0),
+            amount: 5,
+            blocked: 4,
+            hp_lost: 1
         }));
     }
 
     #[test]
     fn skull_splitter_applies_vulnerable_and_amplifies_followups() {
-        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
-                              vec![CardId::SkullSplitter, CardId::Hew]);
+        let mut c = combat_vs(
+            vec![enemy(Species::GraveWolf, 40)],
+            vec![CardId::SkullSplitter, CardId::Hew],
+        );
         play(&mut c, 0, Some(0)).unwrap(); // 8 damage + Vulnerable 2
         assert_eq!(c.enemies[0].hp, 32);
         assert_eq!(c.enemies[0].statuses.vulnerable, 2);
@@ -879,13 +1106,17 @@ mod tests {
 
     #[test]
     fn surge_of_rage_gives_temporary_strength() {
-        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
-                              vec![CardId::SurgeOfRage, CardId::Hew]);
+        let mut c = combat_vs(
+            vec![enemy(Species::GraveWolf, 40)],
+            vec![CardId::SurgeOfRage, CardId::Hew],
+        );
         let events = play(&mut c, 0, None).unwrap();
         assert_eq!(c.player.statuses.strength, 2);
         assert_eq!(c.player.statuses.strength_down, 2);
         assert!(events.contains(&CombatEvent::StatusApplied {
-            target: TargetRef::Player, status: StatusKind::Strength, amount: 2
+            target: TargetRef::Player,
+            status: StatusKind::Strength,
+            amount: 2
         }));
         play(&mut c, 0, Some(0)).unwrap(); // Hew: 6+2 = 8
         assert_eq!(c.enemies[0].hp, 32);
@@ -893,8 +1124,10 @@ mod tests {
 
     #[test]
     fn berserkergang_is_consumed_and_strength_persists() {
-        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)],
-                              vec![CardId::Berserkergang, CardId::Hew]);
+        let mut c = combat_vs(
+            vec![enemy(Species::GraveWolf, 40)],
+            vec![CardId::Berserkergang, CardId::Hew],
+        );
         play(&mut c, 0, None).unwrap();
         assert_eq!(c.player.statuses.strength, 2);
         assert_eq!(c.player.statuses.strength_down, 0);
@@ -905,57 +1138,88 @@ mod tests {
 
     #[test]
     fn rising_fury_adds_a_copy_to_discard() {
-        let mut c = combat_vs(vec![enemy(Species::GraveWolf, 40)], vec![CardId::RisingFury]);
+        let mut c = combat_vs(
+            vec![enemy(Species::GraveWolf, 40)],
+            vec![CardId::RisingFury],
+        );
         let energy_before = c.player.energy;
         let events = play(&mut c, 0, Some(0)).unwrap();
         assert_eq!(c.player.energy, energy_before, "Rising Fury costs 0");
         assert_eq!(c.enemies[0].hp, 34);
         // Copy added during resolution + the played card itself.
         assert_eq!(c.discard, vec![CardId::RisingFury, CardId::RisingFury]);
-        assert!(events.contains(&CombatEvent::CardAddedToDiscard { card: CardId::RisingFury }));
+        assert!(events.contains(&CombatEvent::CardAddedToDiscard {
+            card: CardId::RisingFury
+        }));
     }
 
     #[test]
     fn enrage_triggers_on_skills_and_updates_intent() {
-        let mut c = combat_vs(vec![enemy(Species::ForestTroll, 84)],
-                              vec![CardId::RaiseShield, CardId::Hew]);
+        let mut c = combat_vs(
+            vec![enemy(Species::ForestTroll, 84)],
+            vec![CardId::RaiseShield, CardId::Hew],
+        );
         c.enemies[0].statuses.enrage = 2;
         c.enemies[0].next_move = EnemyMove::Rush;
         let events = play(&mut c, 0, None).unwrap(); // skill
         assert_eq!(c.enemies[0].statuses.strength, 2);
         assert!(events.contains(&CombatEvent::StatusApplied {
-            target: TargetRef::Enemy(0), status: StatusKind::Strength, amount: 2
+            target: TargetRef::Enemy(0),
+            status: StatusKind::Strength,
+            amount: 2
         }));
         assert!(events.contains(&CombatEvent::IntentSet {
             index: 0,
-            intent: IntentKind::Attack { damage: 16, hits: 1 }, // 14 + 2
+            intent: IntentKind::Attack {
+                damage: 16,
+                hits: 1
+            }, // 14 + 2
         }));
         let events = play(&mut c, 0, Some(0)).unwrap(); // attack: no enrage
         assert_eq!(c.enemies[0].statuses.strength, 2);
-        assert!(!events.iter().any(|e| matches!(e,
-            CombatEvent::StatusApplied { status: StatusKind::Strength, .. })));
+        assert!(!events.iter().any(|e| matches!(
+            e,
+            CombatEvent::StatusApplied {
+                status: StatusKind::Strength,
+                ..
+            }
+        )));
     }
 
     #[test]
     fn killing_the_last_enemy_wins_and_locks_the_combat() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 5)], vec![CardId::Hew, CardId::Hew]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 5)],
+            vec![CardId::Hew, CardId::Hew],
+        );
         let events = play(&mut c, 0, Some(0)).unwrap();
         assert_eq!(c.over, Some(Outcome::Victory));
         assert!(events.contains(&CombatEvent::EnemyDied { index: 0 }));
         assert!(events.contains(&CombatEvent::Victory));
         assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::CombatOver));
         let mut rng = RunRng::new(0);
-        assert_eq!(c.apply(&mut rng, Action::EndTurn), Err(IllegalAction::CombatOver));
+        assert_eq!(
+            c.apply(&mut rng, Action::EndTurn),
+            Err(IllegalAction::CombatOver)
+        );
     }
 
     #[test]
     fn skull_splitter_kill_skips_the_vulnerable_application() {
         // Victory stops remaining effects: the kill comes first in the list.
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 8)], vec![CardId::SkullSplitter]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 8)],
+            vec![CardId::SkullSplitter],
+        );
         let events = play(&mut c, 0, Some(0)).unwrap();
         assert_eq!(c.over, Some(Outcome::Victory));
-        assert!(!events.iter().any(|e| matches!(e,
-            CombatEvent::StatusApplied { status: StatusKind::Vulnerable, .. })));
+        assert!(!events.iter().any(|e| matches!(
+            e,
+            CombatEvent::StatusApplied {
+                status: StatusKind::Vulnerable,
+                ..
+            }
+        )));
     }
 
     #[test]
@@ -964,15 +1228,26 @@ mod tests {
         let mut c = combat_vs(vec![enemy(Species::BarrowRat, 3)], vec![CardId::ThorsWrath]);
         let events = play(&mut c, 0, None).unwrap();
         assert_eq!(c.over, Some(Outcome::Victory));
-        assert!(!events.iter().any(|e| matches!(e,
-            CombatEvent::StatusApplied { status: StatusKind::Vulnerable, .. })));
+        assert!(!events.iter().any(|e| matches!(
+            e,
+            CombatEvent::StatusApplied {
+                status: StatusKind::Vulnerable,
+                ..
+            }
+        )));
     }
 
     #[test]
     fn not_enough_energy_is_rejected() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::SkullSplitter]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::SkullSplitter],
+        );
         c.player.energy = 1; // Skull-Splitter costs 2
-        assert_eq!(play(&mut c, 0, Some(0)), Err(IllegalAction::NotEnoughEnergy));
+        assert_eq!(
+            play(&mut c, 0, Some(0)),
+            Err(IllegalAction::NotEnoughEnergy)
+        );
         assert_eq!(c.hand.len(), 1); // nothing changed
         assert_eq!(c.player.energy, 1);
     }
@@ -1021,8 +1296,10 @@ mod tests {
 
     #[test]
     fn end_turn_discards_hand_and_refills_everything() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)],
-                              vec![CardId::Hew, CardId::RaiseShield]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::Hew, CardId::RaiseShield],
+        );
         c.draw = starter_deck();
         c.player.energy = 0;
         c.player.block = 7;
@@ -1034,7 +1311,9 @@ mod tests {
         assert_eq!(c.hand.len(), 5);
         assert!(c.discard.contains(&CardId::RaiseShield));
         assert!(events.contains(&CombatEvent::TurnStarted { turn: 2 }));
-        assert!(events.iter().any(|e| matches!(e, CombatEvent::IntentSet { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::IntentSet { .. })));
     }
 
     #[test]
@@ -1044,21 +1323,28 @@ mod tests {
         let events = end_turn(&mut c, 1);
         assert_eq!(c.player.hp, 78);
         assert!(events.contains(&CombatEvent::DamageDealt {
-            target: TargetRef::Player, amount: 6, blocked: 4, hp_lost: 2
+            target: TargetRef::Player,
+            amount: 6,
+            blocked: 4,
+            hp_lost: 2
         }));
         assert!(events.contains(&CombatEvent::EnemyMoved {
-            index: 0, mv: EnemyMove::DarkStrike
+            index: 0,
+            mv: EnemyMove::DarkStrike
         }));
     }
 
     #[test]
     fn ritual_skips_its_first_turn_then_scales_6_9_12() {
         // Fresh chanter exactly as a real fight starts.
-        let mut c = combat_vs(vec![Enemy {
-            history: vec![],
-            next_move: EnemyMove::Chant,
-            ..enemy(Species::DraugrChanter, 54)
-        }], vec![]);
+        let mut c = combat_vs(
+            vec![Enemy {
+                history: vec![],
+                next_move: EnemyMove::Chant,
+                ..enemy(Species::DraugrChanter, 54)
+            }],
+            vec![],
+        );
         let hp0 = c.player.hp;
         end_turn(&mut c, 1); // chant; ritual fresh: no strength yet
         assert_eq!(c.player.hp, hp0);
@@ -1075,10 +1361,13 @@ mod tests {
 
     #[test]
     fn fen_rat_spittle_weakens_the_player() {
-        let mut c = combat_vs(vec![Enemy {
-            next_move: EnemyMove::Spittle,
-            ..enemy(Species::FenRat, 14)
-        }], vec![CardId::Hew]);
+        let mut c = combat_vs(
+            vec![Enemy {
+                next_move: EnemyMove::Spittle,
+                ..enemy(Species::FenRat, 14)
+            }],
+            vec![CardId::Hew],
+        );
         end_turn(&mut c, 1);
         assert_eq!(c.player.statuses.weak, 2);
         // Weak player: Hew deals floor(6*0.75) = 4.
@@ -1094,13 +1383,16 @@ mod tests {
         let events = end_turn(&mut c, 1);
         assert_eq!(c.player.hp, 71);
         assert!(events.contains(&CombatEvent::StatusTicked {
-            target: TargetRef::Player, status: StatusKind::Vulnerable, remaining: 1
+            target: TargetRef::Player,
+            status: StatusKind::Vulnerable,
+            remaining: 1
         }));
         // Next end turn: tick 1→0, enemy hits plain 6.
         let events = end_turn(&mut c, 2);
         assert_eq!(c.player.hp, 65);
         assert!(events.contains(&CombatEvent::StatusExpired {
-            target: TargetRef::Player, status: StatusKind::Vulnerable
+            target: TargetRef::Player,
+            status: StatusKind::Vulnerable
         }));
     }
 
@@ -1112,36 +1404,46 @@ mod tests {
         let events = end_turn(&mut c, 1);
         assert_eq!(c.enemies[0].statuses.vulnerable, 1);
         assert!(events.contains(&CombatEvent::StatusTicked {
-            target: TargetRef::Enemy(0), status: StatusKind::Vulnerable, remaining: 1
+            target: TargetRef::Enemy(0),
+            status: StatusKind::Vulnerable,
+            remaining: 1
         }));
     }
 
     #[test]
     fn strength_down_fires_at_end_of_player_turn() {
-        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)],
-                              vec![CardId::SurgeOfRage]);
+        let mut c = combat_vs(
+            vec![enemy(Species::DraugrChanter, 50)],
+            vec![CardId::SurgeOfRage],
+        );
         play(&mut c, 0, None).unwrap();
         assert_eq!(c.player.statuses.strength, 2);
         let events = end_turn(&mut c, 1);
         assert_eq!(c.player.statuses.strength, 0);
         assert_eq!(c.player.statuses.strength_down, 0);
         assert!(events.contains(&CombatEvent::StatusApplied {
-            target: TargetRef::Player, status: StatusKind::Strength, amount: -2
+            target: TargetRef::Player,
+            status: StatusKind::Strength,
+            amount: -2
         }));
         assert!(events.contains(&CombatEvent::StatusExpired {
-            target: TargetRef::Player, status: StatusKind::StrengthDown
+            target: TargetRef::Player,
+            status: StatusKind::StrengthDown
         }));
     }
 
     #[test]
     fn thrash_attacks_and_blocks_and_bellow_buffs() {
-        let mut c = combat_vs(vec![Enemy {
-            next_move: EnemyMove::Thrash,
-            ..enemy(Species::GraveWolf, 40)
-        }], vec![]);
+        let mut c = combat_vs(
+            vec![Enemy {
+                next_move: EnemyMove::Thrash,
+                ..enemy(Species::GraveWolf, 40)
+            }],
+            vec![],
+        );
         end_turn(&mut c, 1);
         assert_eq!(c.player.hp, 73); // 7 damage
-        // Wolf's block was gained AFTER its block reset, so it shows 5 now.
+                                     // Wolf's block was gained AFTER its block reset, so it shows 5 now.
         assert_eq!(c.enemies[0].block, 5);
         // Next turn the wolf's own block resets first.
         c.enemies[0].next_move = EnemyMove::Bellow;
@@ -1152,11 +1454,14 @@ mod tests {
 
     #[test]
     fn troll_bellow_applies_enrage() {
-        let mut c = combat_vs(vec![Enemy {
-            history: vec![],
-            next_move: EnemyMove::TrollBellow,
-            ..enemy(Species::ForestTroll, 84)
-        }], vec![]);
+        let mut c = combat_vs(
+            vec![Enemy {
+                history: vec![],
+                next_move: EnemyMove::TrollBellow,
+                ..enemy(Species::ForestTroll, 84)
+            }],
+            vec![],
+        );
         end_turn(&mut c, 1);
         assert_eq!(c.enemies[0].statuses.enrage, 2);
     }
@@ -1164,34 +1469,45 @@ mod tests {
     #[test]
     fn player_death_stops_the_round_immediately() {
         let mut c = combat_vs(
-            vec![enemy(Species::DraugrChanter, 50), enemy(Species::DraugrChanter, 50)],
+            vec![
+                enemy(Species::DraugrChanter, 50),
+                enemy(Species::DraugrChanter, 50),
+            ],
             vec![],
         );
         c.player.hp = 3; // first DarkStrike (6) kills
         let events = end_turn(&mut c, 1);
         assert_eq!(c.over, Some(Outcome::Defeat));
         assert!(events.contains(&CombatEvent::PlayerDied));
-        let hits = events.iter()
+        let hits = events
+            .iter()
             .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
             .count();
         assert_eq!(hits, 1, "second enemy never acts");
-        assert!(!events.iter().any(|e| matches!(e, CombatEvent::TurnStarted { turn: 2 })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::TurnStarted { turn: 2 })));
     }
 
     #[test]
     fn dead_enemies_are_skipped() {
         let mut c = combat_vs(
-            vec![enemy(Species::DraugrChanter, 50), enemy(Species::DraugrChanter, 50)],
+            vec![
+                enemy(Species::DraugrChanter, 50),
+                enemy(Species::DraugrChanter, 50),
+            ],
             vec![],
         );
         c.enemies[0].hp = 0;
         let events = end_turn(&mut c, 1);
-        let hits = events.iter()
+        let hits = events
+            .iter()
             .filter(|e| matches!(e, CombatEvent::DamageDealt { .. }))
             .count();
         assert_eq!(hits, 1);
-        assert!(!events.iter().any(|e| matches!(e,
-            CombatEvent::IntentSet { index: 0, .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, CombatEvent::IntentSet { index: 0, .. })));
     }
 
     #[test]

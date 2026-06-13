@@ -79,7 +79,11 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
     let first_turn = history.is_empty();
     match species {
         Species::DraugrChanter => {
-            if first_turn { EnemyMove::Chant } else { EnemyMove::DarkStrike }
+            if first_turn {
+                EnemyMove::Chant
+            } else {
+                EnemyMove::DarkStrike
+            }
         }
         Species::GraveWolf => {
             if first_turn {
@@ -112,7 +116,11 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
                 EnemyMove::Spittle
             };
             loop {
-                let candidate = if rng.percent() < 75 { EnemyMove::Bite } else { special };
+                let candidate = if rng.percent() < 75 {
+                    EnemyMove::Bite
+                } else {
+                    special
+                };
                 let ok = if candidate == EnemyMove::Bite {
                     !ran_consecutively(history, EnemyMove::Bite, 2)
                 } else {
@@ -212,8 +220,11 @@ mod tests {
         // assert long-run frequencies sit in generous bands.
         let h = simulate(Species::GraveWolf, 3000, 99);
         let count = |mv| h.iter().filter(|m| **m == mv).count() as f64 / h.len() as f64;
-        let (chomp, thrash, bellow) =
-            (count(EnemyMove::Chomp), count(EnemyMove::Thrash), count(EnemyMove::Bellow));
+        let (chomp, thrash, bellow) = (
+            count(EnemyMove::Chomp),
+            count(EnemyMove::Thrash),
+            count(EnemyMove::Bellow),
+        );
         assert!((0.15..=0.40).contains(&chomp), "chomp {chomp}");
         assert!((0.20..=0.45).contains(&thrash), "thrash {thrash}");
         assert!((0.30..=0.60).contains(&bellow), "bellow {bellow}");
