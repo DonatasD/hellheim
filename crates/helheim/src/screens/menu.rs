@@ -47,6 +47,7 @@ fn despawn_menu(mut commands: Commands, q: Query<Entity, With<MenuRoot>>) {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn begin_button(
     mut commands: Commands,
     cli: Res<CliSeed>,
