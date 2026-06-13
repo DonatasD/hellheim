@@ -86,4 +86,28 @@ mod tests {
             AppState::Combat
         );
     }
+
+    /// Regression: the initial `OnEnter(Menu)` transition is scheduled BEFORE
+    /// `Startup` (StatesPlugin inserts `StateTransition` before `PreStartup`),
+    /// so `spawn_menu`'s `Res<UiFont>` must exist before any schedule runs —
+    /// i.e. the font must be inserted at plugin-build time, not in `Startup`.
+    /// With the font loaded in `Startup`, the first update panics on a missing
+    /// resource. This headless test reproduces that without a window.
+    #[test]
+    fn menu_screen_builds_without_missing_resources() {
+        use crate::screens::menu::MenuPlugin;
+        use crate::theme::{ThemePlugin, UiFont};
+        use bevy::asset::AssetPlugin;
+
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), StatesPlugin));
+        // DefaultPlugins registers the Font asset (via bevy_text); the minimal
+        // set here doesn't, so do it explicitly — ThemePlugin loads a Font.
+        app.init_asset::<bevy::text::Font>();
+        app.init_state::<AppState>();
+        app.insert_resource(CliSeed(Some(0)));
+        app.add_plugins((ThemePlugin, MenuPlugin));
+        app.update();
+        assert!(app.world().contains_resource::<UiFont>());
+    }
 }

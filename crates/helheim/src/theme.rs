@@ -18,14 +18,24 @@ pub struct ThemePlugin;
 
 impl Plugin for ThemePlugin {
     fn build(&self, app: &mut App) {
+        // The initial `OnEnter(Menu)` transition runs before `Startup`
+        // (StatesPlugin schedules `StateTransition` before `PreStartup`), so
+        // any resource a screen's `OnEnter` needs must exist before any
+        // schedule runs. Load the font now, at build time — inserting it in a
+        // `Startup` system is too late and `spawn_menu` panics on a missing
+        // `UiFont`. `AssetServer` is already present (DefaultPlugins built it).
+        let font = app
+            .world()
+            .resource::<AssetServer>()
+            .load("fonts/FiraSans-Regular.ttf");
         app.insert_resource(ClearColor(BG))
+            .insert_resource(UiFont(font))
             .add_systems(Startup, setup);
     }
 }
 
-fn setup(mut commands: Commands, assets: Res<AssetServer>) {
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
-    commands.insert_resource(UiFont(assets.load("fonts/FiraSans-Regular.ttf")));
 }
 
 /// Text bundle helper: every label in the game goes through this.
