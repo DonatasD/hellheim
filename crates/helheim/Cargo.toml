@@ -1,0 +1,13 @@
+[package]
+name = "helheim"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+helheim_core = { path = "../helheim_core" }
+bevy = "0.18"
+rand = "0.9"
+
+[features]
+# cargo run -p helheim --features dev  → much faster rebuilds
+dev = ["bevy/dynamic_linking"]

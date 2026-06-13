@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/helheim_core"]
+members = ["crates/helheim_core", "crates/helheim"]
 
 # Fast dev iteration: light optimization for our code, full for dependencies.
 [profile.dev]
