@@ -143,9 +143,18 @@ fn spawn_combat_ui(commands: &mut Commands, font: &UiFont, ds: &DisplayState) {
                     ))
                     .with_children(|p| {
                         p.spawn(theme::text(font, "The Berserker", 24., theme::ACCENT));
-                        p.spawn((Bind::Hp(TargetRef::Player), theme::text(font, "", 22., theme::HP_COLOR)));
-                        p.spawn((Bind::Block(TargetRef::Player), theme::text(font, "", 18., theme::BLOCK_COLOR)));
-                        p.spawn((Bind::Status(TargetRef::Player), theme::text(font, "", 16., theme::TEXT_DIM)));
+                        p.spawn((
+                            Bind::Hp(TargetRef::Player),
+                            theme::text(font, "", 22., theme::HP_COLOR),
+                        ));
+                        p.spawn((
+                            Bind::Block(TargetRef::Player),
+                            theme::text(font, "", 18., theme::BLOCK_COLOR),
+                        ));
+                        p.spawn((
+                            Bind::Status(TargetRef::Player),
+                            theme::text(font, "", 16., theme::TEXT_DIM),
+                        ));
                     });
 
                 // enemies, in spawn order
@@ -172,10 +181,22 @@ fn spawn_combat_ui(commands: &mut Commands, font: &UiFont, ds: &DisplayState) {
                             ))
                             .with_children(|p| {
                                 p.spawn(theme::text(font, enemy.name, 22., theme::TEXT));
-                                p.spawn((Bind::Intent(i), theme::text(font, "", 18., theme::ENERGY_COLOR)));
-                                p.spawn((Bind::Hp(TargetRef::Enemy(i)), theme::text(font, "", 20., theme::HP_COLOR)));
-                                p.spawn((Bind::Block(TargetRef::Enemy(i)), theme::text(font, "", 16., theme::BLOCK_COLOR)));
-                                p.spawn((Bind::Status(TargetRef::Enemy(i)), theme::text(font, "", 14., theme::TEXT_DIM)));
+                                p.spawn((
+                                    Bind::Intent(i),
+                                    theme::text(font, "", 18., theme::ENERGY_COLOR),
+                                ));
+                                p.spawn((
+                                    Bind::Hp(TargetRef::Enemy(i)),
+                                    theme::text(font, "", 20., theme::HP_COLOR),
+                                ));
+                                p.spawn((
+                                    Bind::Block(TargetRef::Enemy(i)),
+                                    theme::text(font, "", 16., theme::BLOCK_COLOR),
+                                ));
+                                p.spawn((
+                                    Bind::Status(TargetRef::Enemy(i)),
+                                    theme::text(font, "", 14., theme::TEXT_DIM),
+                                ));
                             });
                         }
                     });
@@ -190,7 +211,10 @@ fn spawn_combat_ui(commands: &mut Commands, font: &UiFont, ds: &DisplayState) {
                 ..default()
             })
             .with_children(|bar| {
-                bar.spawn((Bind::Energy, theme::text(font, "", 30., theme::ENERGY_COLOR)));
+                bar.spawn((
+                    Bind::Energy,
+                    theme::text(font, "", 30., theme::ENERGY_COLOR),
+                ));
                 bar.spawn((
                     HandRow,
                     Node {
@@ -207,13 +231,27 @@ fn spawn_combat_ui(commands: &mut Commands, font: &UiFont, ds: &DisplayState) {
 
 fn status_line(s: &Statuses) -> String {
     let mut parts = Vec::new();
-    if s.strength != 0 { parts.push(format!("Str {:+}", s.strength)); }
-    if s.vulnerable > 0 { parts.push(format!("Vuln {}", s.vulnerable)); }
-    if s.weak > 0 { parts.push(format!("Weak {}", s.weak)); }
-    if s.ritual > 0 { parts.push(format!("Ritual {}", s.ritual)); }
-    if s.enrage > 0 { parts.push(format!("Enrage {}", s.enrage)); }
-    if let Some(c) = s.curl_up { parts.push(format!("Curl Up {c}")); }
-    if s.strength_down > 0 { parts.push(format!("Str Down {}", s.strength_down)); }
+    if s.strength != 0 {
+        parts.push(format!("Str {:+}", s.strength));
+    }
+    if s.vulnerable > 0 {
+        parts.push(format!("Vuln {}", s.vulnerable));
+    }
+    if s.weak > 0 {
+        parts.push(format!("Weak {}", s.weak));
+    }
+    if s.ritual > 0 {
+        parts.push(format!("Ritual {}", s.ritual));
+    }
+    if s.enrage > 0 {
+        parts.push(format!("Enrage {}", s.enrage));
+    }
+    if let Some(c) = s.curl_up {
+        parts.push(format!("Curl Up {c}"));
+    }
+    if s.strength_down > 0 {
+        parts.push(format!("Str Down {}", s.strength_down));
+    }
     parts.join("  ")
 }
 
@@ -248,18 +286,26 @@ fn sync_texts(ds: Res<DisplayState>, mut q: Query<(&Bind, &mut Text)>) {
                 block_line(ds.enemies.get(*i).map(|e| e.block).unwrap_or(0))
             }
             Bind::Status(TargetRef::Player) => status_line(&ds.statuses),
-            Bind::Status(TargetRef::Enemy(i)) => {
-                ds.enemies.get(*i).map(|e| status_line(&e.statuses)).unwrap_or_default()
-            }
-            Bind::Intent(i) => {
-                ds.enemies.get(*i).map(|e| intent_line(e.intent)).unwrap_or_default()
-            }
+            Bind::Status(TargetRef::Enemy(i)) => ds
+                .enemies
+                .get(*i)
+                .map(|e| status_line(&e.statuses))
+                .unwrap_or_default(),
+            Bind::Intent(i) => ds
+                .enemies
+                .get(*i)
+                .map(|e| intent_line(e.intent))
+                .unwrap_or_default(),
         };
     }
 }
 
 fn block_line(block: u32) -> String {
-    if block > 0 { format!("Block {block}") } else { String::new() }
+    if block > 0 {
+        format!("Block {block}")
+    } else {
+        String::new()
+    }
 }
 
 fn rebuild_hand(
@@ -279,8 +325,16 @@ fn rebuild_hand(
     for (i, card) in ds.hand.iter().enumerate() {
         let spec = card.spec();
         let affordable = spec.cost <= ds.energy;
-        let bg = if affordable { theme::PANEL } else { theme::PANEL_DIM };
-        let label = if i < 9 { format!("[{}]", i + 1) } else { "[0]".into() };
+        let bg = if affordable {
+            theme::PANEL
+        } else {
+            theme::PANEL_DIM
+        };
+        let label = if i < 9 {
+            format!("[{}]", i + 1)
+        } else {
+            "[0]".into()
+        };
         let button = commands
             .spawn((
                 CardButton(i),
@@ -296,7 +350,12 @@ fn rebuild_hand(
                 BackgroundColor(bg),
             ))
             .with_children(|c| {
-                c.spawn(theme::text(&font, format!("({}) {}", spec.cost, spec.name), 17., theme::TEXT));
+                c.spawn(theme::text(
+                    &font,
+                    format!("({}) {}", spec.cost, spec.name),
+                    17.,
+                    theme::TEXT,
+                ));
                 c.spawn(theme::text(&font, spec.text, 14., theme::TEXT_DIM));
                 c.spawn(theme::text(&font, label, 13., theme::TEXT_DIM));
             })
@@ -313,7 +372,9 @@ fn highlight_enemies(
     mut panels: Query<(&PanelTarget, &mut BackgroundColor, Option<&Interaction>)>,
 ) {
     for (panel, mut bg, interaction) in &mut panels {
-        let TargetRef::Enemy(i) = panel.0 else { continue };
+        let TargetRef::Enemy(i) = panel.0 else {
+            continue;
+        };
         let alive = ds.enemies.get(i).map(|e| e.alive).unwrap_or(false);
         let targeting = pending.0.is_some() && alive;
         let hovered = matches!(interaction, Some(Interaction::Hovered));
@@ -345,7 +406,9 @@ fn try_play(
     session: &mut Session,
     queue: &mut EventQueue,
 ) {
-    let Some(card) = ds.hand.get(index) else { return };
+    let Some(card) = ds.hand.get(index) else {
+        return;
+    };
     let spec = card.spec();
     if spec.cost > ds.energy {
         return;
@@ -363,7 +426,10 @@ fn try_play(
             cursor.0 = living[0];
         }
         _ => dispatch(
-            Action::PlayCard { hand_index: index, target: None },
+            Action::PlayCard {
+                hand_index: index,
+                target: None,
+            },
             session,
             queue,
         ),
@@ -380,7 +446,14 @@ fn card_click(
 ) {
     for (interaction, button) in &buttons {
         if *interaction == Interaction::Pressed {
-            try_play(button.0, &ds, &mut pending, &mut cursor, &mut session, &mut queue);
+            try_play(
+                button.0,
+                &ds,
+                &mut pending,
+                &mut cursor,
+                &mut session,
+                &mut queue,
+            );
         }
     }
 }
@@ -394,12 +467,17 @@ fn enemy_click(
 ) {
     let Some(card_index) = pending.0 else { return };
     for (interaction, panel) in &panels {
-        let TargetRef::Enemy(i) = panel.0 else { continue };
+        let TargetRef::Enemy(i) = panel.0 else {
+            continue;
+        };
         let alive = ds.enemies.get(i).map(|e| e.alive).unwrap_or(false);
         if *interaction == Interaction::Pressed && alive {
             pending.0 = None;
             dispatch(
-                Action::PlayCard { hand_index: card_index, target: Some(i) },
+                Action::PlayCard {
+                    hand_index: card_index,
+                    target: Some(i),
+                },
                 &mut session,
                 &mut queue,
             );
@@ -423,8 +501,16 @@ fn end_turn_button(
 }
 
 const DIGIT_KEYS: [KeyCode; 10] = [
-    KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5,
-    KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9, KeyCode::Digit0,
+    KeyCode::Digit1,
+    KeyCode::Digit2,
+    KeyCode::Digit3,
+    KeyCode::Digit4,
+    KeyCode::Digit5,
+    KeyCode::Digit6,
+    KeyCode::Digit7,
+    KeyCode::Digit8,
+    KeyCode::Digit9,
+    KeyCode::Digit0,
 ];
 
 fn keyboard(
@@ -467,7 +553,10 @@ fn keyboard(
         if keys.just_pressed(KeyCode::Enter) {
             pending.0 = None;
             dispatch(
-                Action::PlayCard { hand_index: card_index, target: Some(cursor.0) },
+                Action::PlayCard {
+                    hand_index: card_index,
+                    target: Some(cursor.0),
+                },
                 &mut session,
                 &mut queue,
             );

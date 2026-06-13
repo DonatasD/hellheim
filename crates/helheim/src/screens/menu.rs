@@ -51,10 +51,7 @@ fn despawn_menu(mut commands: Commands, q: Query<Entity, With<MenuRoot>>) {
 fn begin_button(
     mut commands: Commands,
     cli: Res<CliSeed>,
-    mut q: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<BeginButton>),
-    >,
+    mut q: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<BeginButton>)>,
     mut next: ResMut<NextState<AppState>>,
 ) {
     for (interaction, mut bg) in &mut q {

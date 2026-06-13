@@ -116,7 +116,12 @@ pub fn apply_event(ds: &mut DisplayState, ev: &CombatEvent) {
                 }
             }
         },
-        CombatEvent::DamageDealt { target, blocked, hp_lost, .. } => match target {
+        CombatEvent::DamageDealt {
+            target,
+            blocked,
+            hp_lost,
+            ..
+        } => match target {
             TargetRef::Player => {
                 ds.player_block = ds.player_block.saturating_sub(blocked);
                 ds.player_hp = ds.player_hp.saturating_sub(hp_lost);
@@ -128,12 +133,20 @@ pub fn apply_event(ds: &mut DisplayState, ev: &CombatEvent) {
                 }
             }
         },
-        CombatEvent::StatusApplied { target, status, amount } => {
+        CombatEvent::StatusApplied {
+            target,
+            status,
+            amount,
+        } => {
             if let Some(s) = statuses_of(ds, target) {
                 bump_status(s, status, amount);
             }
         }
-        CombatEvent::StatusTicked { target, status, remaining } => {
+        CombatEvent::StatusTicked {
+            target,
+            status,
+            remaining,
+        } => {
             if let Some(s) = statuses_of(ds, target) {
                 set_duration(s, status, remaining);
             }
@@ -243,29 +256,38 @@ impl Plugin for AnimPlugin {
 /// Which events pause the replay for a visible beat, and what they show.
 fn beat_visual(ev: &CombatEvent) -> Option<(TargetRef, String, Color)> {
     match ev {
-        CombatEvent::DamageDealt { target, hp_lost, .. } => Some((
+        CombatEvent::DamageDealt {
+            target, hp_lost, ..
+        } => Some((
             *target,
-            if *hp_lost > 0 { format!("-{hp_lost}") } else { "Blocked".into() },
-            if *hp_lost > 0 { theme::HP_COLOR } else { theme::TEXT_DIM },
+            if *hp_lost > 0 {
+                format!("-{hp_lost}")
+            } else {
+                "Blocked".into()
+            },
+            if *hp_lost > 0 {
+                theme::HP_COLOR
+            } else {
+                theme::TEXT_DIM
+            },
         )),
         CombatEvent::BlockGained { target, amount } => {
             Some((*target, format!("+{amount} Block"), theme::BLOCK_COLOR))
         }
-        CombatEvent::EnemyMoved { index, mv } => Some((
-            TargetRef::Enemy(*index),
-            mv.name().to_string(),
-            theme::TEXT,
-        )),
-        CombatEvent::StatusApplied { target, status, amount } => {
-            Some((*target, format!("{status:?} {amount:+}"), theme::TEXT_DIM))
+        CombatEvent::EnemyMoved { index, mv } => {
+            Some((TargetRef::Enemy(*index), mv.name().to_string(), theme::TEXT))
         }
+        CombatEvent::StatusApplied {
+            target,
+            status,
+            amount,
+        } => Some((*target, format!("{status:?} {amount:+}"), theme::TEXT_DIM)),
         _ => None,
     }
 }
 
 fn is_beat(ev: &CombatEvent) -> bool {
-    beat_visual(ev).is_some()
-        || matches!(ev, CombatEvent::Victory | CombatEvent::PlayerDied)
+    beat_visual(ev).is_some() || matches!(ev, CombatEvent::Victory | CombatEvent::PlayerDied)
 }
 
 /// Pop events each beat: bookkeeping applies instantly, beat events pause.
@@ -373,26 +395,49 @@ mod tests {
     fn damage_event_updates_hp_and_block() {
         let mut ds = fixture();
         ds.enemies[0].block = 3;
-        apply_event(&mut ds, &CombatEvent::DamageDealt {
-            target: TargetRef::Enemy(0), amount: 8, blocked: 3, hp_lost: 5,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::DamageDealt {
+                target: TargetRef::Enemy(0),
+                amount: 8,
+                blocked: 3,
+                hp_lost: 5,
+            },
+        );
         assert_eq!(ds.enemies[0].hp, 35);
         assert_eq!(ds.enemies[0].block, 0);
 
-        apply_event(&mut ds, &CombatEvent::DamageDealt {
-            target: TargetRef::Player, amount: 6, blocked: 0, hp_lost: 6,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::DamageDealt {
+                target: TargetRef::Player,
+                amount: 6,
+                blocked: 0,
+                hp_lost: 6,
+            },
+        );
         assert_eq!(ds.player_hp, 74);
     }
 
     #[test]
     fn card_flow_events_track_zone_counts() {
         let mut ds = fixture();
-        apply_event(&mut ds, &CombatEvent::CardPlayed { card: CardId::Hew, hand_index: 0 });
+        apply_event(
+            &mut ds,
+            &CombatEvent::CardPlayed {
+                card: CardId::Hew,
+                hand_index: 0,
+            },
+        );
         assert_eq!(ds.hand, vec![CardId::RaiseShield]);
         assert_eq!(ds.discard_count, 4);
 
-        apply_event(&mut ds, &CombatEvent::CardDrawn { card: CardId::TwinAxes });
+        apply_event(
+            &mut ds,
+            &CombatEvent::CardDrawn {
+                card: CardId::TwinAxes,
+            },
+        );
         assert_eq!(ds.hand, vec![CardId::RaiseShield, CardId::TwinAxes]);
         assert_eq!(ds.draw_count, 4);
 
@@ -409,7 +454,13 @@ mod tests {
     fn powers_do_not_join_the_discard_count() {
         let mut ds = fixture();
         ds.hand = vec![CardId::Berserkergang];
-        apply_event(&mut ds, &CombatEvent::CardPlayed { card: CardId::Berserkergang, hand_index: 0 });
+        apply_event(
+            &mut ds,
+            &CombatEvent::CardPlayed {
+                card: CardId::Berserkergang,
+                hand_index: 0,
+            },
+        );
         assert!(ds.hand.is_empty());
         assert_eq!(ds.discard_count, 3, "powers are consumed");
     }
@@ -417,22 +468,41 @@ mod tests {
     #[test]
     fn status_events_mutate_the_right_creature() {
         let mut ds = fixture();
-        apply_event(&mut ds, &CombatEvent::StatusApplied {
-            target: TargetRef::Enemy(0), status: StatusKind::Vulnerable, amount: 2,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::StatusApplied {
+                target: TargetRef::Enemy(0),
+                status: StatusKind::Vulnerable,
+                amount: 2,
+            },
+        );
         assert_eq!(ds.enemies[0].statuses.vulnerable, 2);
-        apply_event(&mut ds, &CombatEvent::StatusTicked {
-            target: TargetRef::Enemy(0), status: StatusKind::Vulnerable, remaining: 1,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::StatusTicked {
+                target: TargetRef::Enemy(0),
+                status: StatusKind::Vulnerable,
+                remaining: 1,
+            },
+        );
         assert_eq!(ds.enemies[0].statuses.vulnerable, 1);
-        apply_event(&mut ds, &CombatEvent::StatusExpired {
-            target: TargetRef::Enemy(0), status: StatusKind::Vulnerable,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::StatusExpired {
+                target: TargetRef::Enemy(0),
+                status: StatusKind::Vulnerable,
+            },
+        );
         assert_eq!(ds.enemies[0].statuses.vulnerable, 0);
 
-        apply_event(&mut ds, &CombatEvent::StatusApplied {
-            target: TargetRef::Player, status: StatusKind::Strength, amount: -2,
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::StatusApplied {
+                target: TargetRef::Player,
+                status: StatusKind::Strength,
+                amount: -2,
+            },
+        );
         assert_eq!(ds.statuses.strength, -2);
     }
 
@@ -441,12 +511,25 @@ mod tests {
         let mut ds = fixture();
         apply_event(&mut ds, &CombatEvent::TurnStarted { turn: 3 });
         apply_event(&mut ds, &CombatEvent::EnergySet { energy: 2 });
-        apply_event(&mut ds, &CombatEvent::IntentSet {
-            index: 0, intent: IntentKind::Attack { damage: 11, hits: 1 },
-        });
+        apply_event(
+            &mut ds,
+            &CombatEvent::IntentSet {
+                index: 0,
+                intent: IntentKind::Attack {
+                    damage: 11,
+                    hits: 1,
+                },
+            },
+        );
         assert_eq!(ds.turn, 3);
         assert_eq!(ds.energy, 2);
-        assert_eq!(ds.enemies[0].intent, Some(IntentKind::Attack { damage: 11, hits: 1 }));
+        assert_eq!(
+            ds.enemies[0].intent,
+            Some(IntentKind::Attack {
+                damage: 11,
+                hits: 1
+            })
+        );
 
         apply_event(&mut ds, &CombatEvent::EnemyDied { index: 0 });
         assert!(!ds.enemies[0].alive);
@@ -459,9 +542,20 @@ mod tests {
     #[test]
     fn block_events_gain_and_reset() {
         let mut ds = fixture();
-        apply_event(&mut ds, &CombatEvent::BlockGained { target: TargetRef::Player, amount: 5 });
+        apply_event(
+            &mut ds,
+            &CombatEvent::BlockGained {
+                target: TargetRef::Player,
+                amount: 5,
+            },
+        );
         assert_eq!(ds.player_block, 5);
-        apply_event(&mut ds, &CombatEvent::BlockReset { target: TargetRef::Player });
+        apply_event(
+            &mut ds,
+            &CombatEvent::BlockReset {
+                target: TargetRef::Player,
+            },
+        );
         assert_eq!(ds.player_block, 0);
     }
 }

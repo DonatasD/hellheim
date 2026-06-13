@@ -73,11 +73,17 @@ mod tests {
         app.add_plugins((MinimalPlugins, StatesPlugin));
         app.init_state::<AppState>();
         app.update();
-        assert_eq!(*app.world().resource::<State<AppState>>().get(), AppState::Menu);
+        assert_eq!(
+            *app.world().resource::<State<AppState>>().get(),
+            AppState::Menu
+        );
         app.world_mut()
             .resource_mut::<NextState<AppState>>()
             .set(AppState::Combat);
         app.update();
-        assert_eq!(*app.world().resource::<State<AppState>>().get(), AppState::Combat);
+        assert_eq!(
+            *app.world().resource::<State<AppState>>().get(),
+            AppState::Combat
+        );
     }
 }
