@@ -194,14 +194,22 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
             }
         }
         Species::DraugrWarrior => loop {
-            let candidate = if rng.percent() < 60 { EnemyMove::Stab } else { EnemyMove::Rend };
+            let candidate = if rng.percent() < 60 {
+                EnemyMove::Stab
+            } else {
+                EnemyMove::Rend
+            };
             if ran_consecutively(history, candidate, 2) {
                 continue;
             }
             return candidate;
         },
         Species::Hrafn => loop {
-            let candidate = if rng.percent() < 60 { EnemyMove::Peck } else { EnemyMove::Screech };
+            let candidate = if rng.percent() < 60 {
+                EnemyMove::Peck
+            } else {
+                EnemyMove::Screech
+            };
             if ran_consecutively(history, candidate, 2) {
                 continue;
             }
@@ -212,8 +220,14 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
                 return EnemyMove::Fester;
             }
             loop {
-                let candidate = if rng.percent() < 70 { EnemyMove::Bite } else { EnemyMove::Fester };
-                if candidate == EnemyMove::Fester && ran_consecutively(history, EnemyMove::Fester, 1) {
+                let candidate = if rng.percent() < 70 {
+                    EnemyMove::Bite
+                } else {
+                    EnemyMove::Fester
+                };
+                if candidate == EnemyMove::Fester
+                    && ran_consecutively(history, EnemyMove::Fester, 1)
+                {
                     continue;
                 }
                 return candidate;
@@ -224,8 +238,14 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
                 return EnemyMove::SoulDrain;
             }
             loop {
-                let candidate = if rng.percent() < 70 { EnemyMove::Maul } else { EnemyMove::SoulDrain };
-                if candidate == EnemyMove::SoulDrain && ran_consecutively(history, EnemyMove::SoulDrain, 1) {
+                let candidate = if rng.percent() < 70 {
+                    EnemyMove::Maul
+                } else {
+                    EnemyMove::SoulDrain
+                };
+                if candidate == EnemyMove::SoulDrain
+                    && ran_consecutively(history, EnemyMove::SoulDrain, 1)
+                {
                     continue;
                 }
                 return candidate;
@@ -412,7 +432,16 @@ mod tests {
         use EnemyMove::*;
         assert_eq!(
             h,
-            vec![DreadRoar, CrushingBlow, GraveCleave, Bulwark, DreadRoar, CrushingBlow, GraveCleave, Bulwark]
+            vec![
+                DreadRoar,
+                CrushingBlow,
+                GraveCleave,
+                Bulwark,
+                DreadRoar,
+                CrushingBlow,
+                GraveCleave,
+                Bulwark
+            ]
         );
     }
 

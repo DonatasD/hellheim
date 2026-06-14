@@ -168,7 +168,11 @@ impl CombatState {
                 let (lo, hi) = sp.hp_range();
                 let hp = rng.range(lo, hi);
                 let is_rat = matches!(sp, Species::BarrowRat | Species::FenRat);
-                let bite_damage = if is_rat { rng.range(5, 7) } else { 0 };
+                let bite_damage = match sp {
+                    Species::BarrowRat | Species::FenRat => rng.range(5, 7),
+                    Species::MireCrawler => 6,
+                    _ => 0,
+                };
                 let curl_up = is_rat.then(|| rng.range(3, 7));
                 Enemy {
                     species: sp,
@@ -262,20 +266,43 @@ impl CombatState {
                 IntentKind::Buff
             }
             EnemyMove::Spittle => IntentKind::Debuff,
-            // Act 1 bestiary — intents implemented in Task 3
-            EnemyMove::Stab
-            | EnemyMove::Rend
-            | EnemyMove::Fester
-            | EnemyMove::Peck
-            | EnemyMove::Screech
-            | EnemyMove::Maul
-            | EnemyMove::SoulDrain
-            | EnemyMove::WarChant
-            | EnemyMove::Cleave
-            | EnemyMove::CrushingBlow
-            | EnemyMove::GraveCleave
-            | EnemyMove::DreadRoar
-            | EnemyMove::Bulwark => unimplemented!("Act 1 bestiary intents not yet implemented"),
+            EnemyMove::Stab => IntentKind::Attack {
+                damage: atk(12),
+                hits: 1,
+            },
+            EnemyMove::Rend => IntentKind::Attack {
+                damage: atk(8),
+                hits: 1,
+            },
+            EnemyMove::Maul => IntentKind::Attack {
+                damage: atk(18),
+                hits: 1,
+            },
+            EnemyMove::Screech => IntentKind::Attack {
+                damage: atk(5),
+                hits: 1,
+            },
+            EnemyMove::CrushingBlow => IntentKind::Attack {
+                damage: atk(22),
+                hits: 1,
+            },
+            EnemyMove::Peck => IntentKind::Attack {
+                damage: atk(4),
+                hits: 2,
+            },
+            EnemyMove::Cleave => IntentKind::Attack {
+                damage: atk(8),
+                hits: 2,
+            },
+            EnemyMove::GraveCleave => IntentKind::Attack {
+                damage: atk(6),
+                hits: 3,
+            },
+            EnemyMove::Bulwark => IntentKind::AttackDefend { damage: atk(10) },
+            // DreadRoar both buffs (Strength) and debuffs (player Vulnerable); shown
+            // as Buff because the Strength gain is the primary, lasting threat.
+            EnemyMove::Fester | EnemyMove::WarChant | EnemyMove::DreadRoar => IntentKind::Buff,
+            EnemyMove::SoulDrain => IntentKind::Debuff,
         }
     }
 
@@ -716,20 +743,86 @@ impl CombatState {
                     });
                 }
             }
-            // Act 1 bestiary — combat resolution implemented in Task 3
-            EnemyMove::Stab
-            | EnemyMove::Rend
-            | EnemyMove::Fester
-            | EnemyMove::Peck
-            | EnemyMove::Screech
-            | EnemyMove::Maul
-            | EnemyMove::SoulDrain
-            | EnemyMove::WarChant
-            | EnemyMove::Cleave
-            | EnemyMove::CrushingBlow
-            | EnemyMove::GraveCleave
-            | EnemyMove::DreadRoar
-            | EnemyMove::Bulwark => unimplemented!("Act 1 bestiary moves not yet implemented"),
+            EnemyMove::Stab => self.enemy_attack(i, 12, events),
+            EnemyMove::Maul => self.enemy_attack(i, 18, events),
+            EnemyMove::CrushingBlow => self.enemy_attack(i, 22, events),
+            EnemyMove::Peck => self.enemy_attack_multi(i, 4, 2, events),
+            EnemyMove::Cleave => self.enemy_attack_multi(i, 8, 2, events),
+            EnemyMove::GraveCleave => self.enemy_attack_multi(i, 6, 3, events),
+            EnemyMove::Rend => {
+                self.enemy_attack(i, 8, events);
+                if self.over.is_none() {
+                    self.player.statuses.weak += 1;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Player,
+                        status: StatusKind::Weak,
+                        amount: 1,
+                    });
+                }
+            }
+            EnemyMove::Screech => {
+                self.enemy_attack(i, 5, events);
+                if self.over.is_none() {
+                    self.player.statuses.vulnerable += 1;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Player,
+                        status: StatusKind::Vulnerable,
+                        amount: 1,
+                    });
+                }
+            }
+            EnemyMove::Fester => {
+                self.enemies[i].statuses.strength += 4;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Strength,
+                    amount: 4,
+                });
+            }
+            EnemyMove::SoulDrain => {
+                self.player.statuses.strength -= 2;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Strength,
+                    amount: -2,
+                });
+            }
+            EnemyMove::WarChant => {
+                let e = &mut self.enemies[i];
+                e.statuses.ritual += 2;
+                e.statuses.ritual_fresh = true;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Ritual,
+                    amount: 2,
+                });
+            }
+            EnemyMove::DreadRoar => {
+                self.enemies[i].statuses.strength += 3;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Enemy(i),
+                    status: StatusKind::Strength,
+                    amount: 3,
+                });
+                self.player.statuses.vulnerable += 2;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Vulnerable,
+                    amount: 2,
+                });
+            }
+            EnemyMove::Bulwark => {
+                // Attack first, then block — mirrors Thrash, so the post-attack
+                // effect is correctly skipped if the hit ends the combat.
+                self.enemy_attack(i, 10, events);
+                if self.over.is_none() {
+                    self.enemies[i].block += 18;
+                    events.push(CombatEvent::BlockGained {
+                        target: TargetRef::Enemy(i),
+                        amount: 18,
+                    });
+                }
+            }
         }
     }
 
@@ -751,6 +844,21 @@ impl CombatState {
         if self.player.hp == 0 {
             self.over = Some(Outcome::Defeat);
             events.push(CombatEvent::PlayerDied);
+        }
+    }
+
+    fn enemy_attack_multi(
+        &mut self,
+        i: usize,
+        base: u32,
+        hits: u32,
+        events: &mut Vec<CombatEvent>,
+    ) {
+        for _ in 0..hits {
+            if self.over.is_some() {
+                return;
+            }
+            self.enemy_attack(i, base, events);
         }
     }
 }
@@ -1598,5 +1706,73 @@ mod tests {
         let out = soak(&mut block, &mut hp, 99);
         assert_eq!(hp, 0);
         assert_eq!(out.hp_lost, 3);
+    }
+
+    #[test]
+    fn warlord_cleave_hits_twice() {
+        let mut e = enemy(Species::DraugrWarlord, 90);
+        e.next_move = EnemyMove::Cleave;
+        e.history = vec![EnemyMove::WarChant];
+        let mut c = combat_vs(vec![e], vec![]);
+        c.player.hp = 80;
+        end_turn(&mut c, 1);
+        // Cleave = 8 x2 = 16 to an unblocked player.
+        assert_eq!(c.player.hp, 64);
+    }
+
+    #[test]
+    fn soul_drain_saps_player_strength() {
+        let mut e = enemy(Species::BarrowWight, 88);
+        e.next_move = EnemyMove::SoulDrain;
+        let mut c = combat_vs(vec![e], vec![]);
+        end_turn(&mut c, 1);
+        assert_eq!(c.player.statuses.strength, -2);
+    }
+
+    #[test]
+    fn jarl_dread_roar_buffs_and_debuffs() {
+        let mut e = enemy(Species::MoundJarl, 150);
+        e.next_move = EnemyMove::DreadRoar;
+        e.history = vec![];
+        let mut c = combat_vs(vec![e], vec![]);
+        end_turn(&mut c, 1);
+        assert_eq!(c.enemies[0].statuses.strength, 3);
+        assert_eq!(c.player.statuses.vulnerable, 2);
+    }
+
+    #[test]
+    fn multi_hit_stops_if_player_dies_midway() {
+        let mut e = enemy(Species::MoundJarl, 150);
+        e.next_move = EnemyMove::GraveCleave; // 6 x3
+        let mut c = combat_vs(vec![e], vec![]);
+        c.player.hp = 5; // first 6-hit kills
+        let events = end_turn(&mut c, 1);
+        assert_eq!(c.player.hp, 0);
+        assert_eq!(c.over, Some(Outcome::Defeat));
+        // Exactly one damage event reached the player (no hits after death).
+        let dmg = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    CombatEvent::DamageDealt {
+                        target: TargetRef::Player,
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(dmg, 1);
+    }
+
+    #[test]
+    fn multi_hit_intent_reports_hits() {
+        let mut e = enemy(Species::DraugrWarlord, 90);
+        e.next_move = EnemyMove::Cleave;
+        let c = combat_vs(vec![e], vec![]);
+        assert!(matches!(
+            c.intent_of(0),
+            IntentKind::Attack { damage: 8, hits: 2 }
+        ));
     }
 }
