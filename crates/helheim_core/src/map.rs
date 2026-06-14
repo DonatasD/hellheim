@@ -76,6 +76,65 @@ fn build_paths(rng: &mut RunRng) -> Vec<Vec<u8>> {
     paths
 }
 
+fn parents_map(graph: &MapGraph) -> BTreeMap<NodeId, Vec<NodeId>> {
+    let mut parents: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
+    for n in &graph.nodes {
+        for nx in &n.next {
+            parents.entry(*nx).or_default().push(n.id);
+        }
+    }
+    parents
+}
+
+/// Assign node kinds floor-ascending: parents are decided before their children
+/// (nodes are stored floor-ascending), so the no-consecutive-special check can
+/// read already-final parent kinds via an index loop (no aliasing).
+fn assign_kinds(graph: &mut MapGraph, rng: &mut RunRng) {
+    let parents = parents_map(graph);
+    for idx in 0..graph.nodes.len() {
+        let id = graph.nodes[idx].id;
+        let f = id.floor;
+        let kind = match f {
+            1 => NodeKind::Monster,
+            9 => NodeKind::Treasure,
+            15 => NodeKind::Rest,
+            BOSS_FLOOR => NodeKind::Boss,
+            _ => {
+                let parent_kinds: Vec<NodeKind> = parents
+                    .get(&id)
+                    .map(|ps| ps.iter().map(|p| graph.kind_of(*p)).collect())
+                    .unwrap_or_default();
+                roll_kind(f, &parent_kinds, rng)
+            }
+        };
+        graph.nodes[idx].kind = kind;
+    }
+}
+
+fn roll_kind(floor: u8, parent_kinds: &[NodeKind], rng: &mut RunRng) -> NodeKind {
+    for _ in 0..20 {
+        let r = rng.percent();
+        let k = if r < 16 {
+            NodeKind::Elite
+        } else if r < 28 {
+            NodeKind::Rest
+        } else {
+            NodeKind::Monster
+        };
+        if matches!(k, NodeKind::Elite | NodeKind::Rest) && floor < 6 {
+            continue;
+        }
+        if k == NodeKind::Rest && floor == 14 {
+            continue;
+        }
+        if matches!(k, NodeKind::Elite | NodeKind::Rest) && parent_kinds.contains(&k) {
+            continue;
+        }
+        return k;
+    }
+    NodeKind::Monster
+}
+
 impl MapGraph {
     pub fn generate(rng: &mut RunRng) -> Self {
         let paths = build_paths(rng);
@@ -137,8 +196,13 @@ impl MapGraph {
             next: Vec::new(),
         });
 
-        MapGraph { nodes }
-        // Kinds (except the boss) are assigned in Task 5.
+        let mut graph = MapGraph { nodes };
+        assign_kinds(&mut graph, rng);
+        graph
+    }
+
+    fn kind_of(&self, id: NodeId) -> NodeKind {
+        self.node(id).kind
     }
 
     pub fn floor1(&self) -> Vec<NodeId> {
@@ -265,5 +329,86 @@ mod tests {
             format!("{:?}", gen(123).all()),
             format!("{:?}", gen(123).all())
         );
+    }
+
+    fn kind_of(g: &MapGraph, floor: u8, col: u8) -> NodeKind {
+        g.node(NodeId { floor, col }).kind
+    }
+
+    #[test]
+    fn fixed_floors_have_fixed_kinds() {
+        for seed in 0..50 {
+            let g = gen(seed);
+            for n in g.nodes_on(1) {
+                assert_eq!(n.kind, NodeKind::Monster);
+            }
+            for n in g.nodes_on(9) {
+                assert_eq!(n.kind, NodeKind::Treasure);
+            }
+            for n in g.nodes_on(15) {
+                assert_eq!(n.kind, NodeKind::Rest);
+            }
+            assert_eq!(kind_of(&g, BOSS_FLOOR, BOSS_COL), NodeKind::Boss);
+        }
+    }
+
+    #[test]
+    fn placement_constraints_hold() {
+        for seed in 0..50 {
+            let g = gen(seed);
+            for n in g.all() {
+                let f = n.id.floor;
+                if f < 6 {
+                    assert!(
+                        !matches!(n.kind, NodeKind::Elite | NodeKind::Rest),
+                        "seed {seed} f{f}"
+                    );
+                }
+                if f == 14 {
+                    assert_ne!(n.kind, NodeKind::Rest, "seed {seed}: rest on 14");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn no_special_shares_a_parent_kind() {
+        for seed in 0..50 {
+            let g = gen(seed);
+            for n in g.all() {
+                if matches!(n.kind, NodeKind::Elite | NodeKind::Rest) {
+                    for p in g.all() {
+                        if p.next.contains(&n.id) {
+                            assert_ne!(p.kind, n.kind, "seed {seed}: {:?} matches parent", n.id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn elite_and_rest_frequencies_sit_in_bands() {
+        let mut elite = 0u32;
+        let mut rest = 0u32;
+        let mut eligible = 0u32;
+        for seed in 0..200 {
+            let g = gen(seed);
+            for n in g.all() {
+                let f = n.id.floor;
+                if (6..=14).contains(&f) && f != 9 {
+                    eligible += 1;
+                    match n.kind {
+                        NodeKind::Elite => elite += 1,
+                        NodeKind::Rest => rest += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        let ef = elite as f64 / eligible as f64;
+        let rf = rest as f64 / eligible as f64;
+        assert!((0.08..=0.26).contains(&ef), "elite {ef}");
+        assert!((0.05..=0.22).contains(&rf), "rest {rf}");
     }
 }
