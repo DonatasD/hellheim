@@ -262,6 +262,20 @@ impl CombatState {
                 IntentKind::Buff
             }
             EnemyMove::Spittle => IntentKind::Debuff,
+            // Act 1 bestiary — intents implemented in Task 3
+            EnemyMove::Stab
+            | EnemyMove::Rend
+            | EnemyMove::Fester
+            | EnemyMove::Peck
+            | EnemyMove::Screech
+            | EnemyMove::Maul
+            | EnemyMove::SoulDrain
+            | EnemyMove::WarChant
+            | EnemyMove::Cleave
+            | EnemyMove::CrushingBlow
+            | EnemyMove::GraveCleave
+            | EnemyMove::DreadRoar
+            | EnemyMove::Bulwark => unimplemented!("Act 1 bestiary intents not yet implemented"),
         }
     }
 
@@ -702,6 +716,20 @@ impl CombatState {
                     });
                 }
             }
+            // Act 1 bestiary — combat resolution implemented in Task 3
+            EnemyMove::Stab
+            | EnemyMove::Rend
+            | EnemyMove::Fester
+            | EnemyMove::Peck
+            | EnemyMove::Screech
+            | EnemyMove::Maul
+            | EnemyMove::SoulDrain
+            | EnemyMove::WarChant
+            | EnemyMove::Cleave
+            | EnemyMove::CrushingBlow
+            | EnemyMove::GraveCleave
+            | EnemyMove::DreadRoar
+            | EnemyMove::Bulwark => unimplemented!("Act 1 bestiary moves not yet implemented"),
         }
     }
 

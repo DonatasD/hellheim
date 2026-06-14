@@ -66,6 +66,20 @@ pub enum EnemyMove {
     TrollBellow, // gain Enrage 2
     Rush,        // attack 14
     SkullBash,   // attack 6, apply 2 Vulnerable
+    // Act 1 bestiary moves:
+    Stab,         // attack 12
+    Rend,         // attack 8 + Weak 1
+    Fester,       // gain Strength 4
+    Peck,         // attack 4 x2
+    Screech,      // attack 5 + Vulnerable 1
+    Maul,         // attack 18
+    SoulDrain,    // player -2 Strength
+    WarChant,     // gain Ritual 2
+    Cleave,       // attack 8 x2
+    CrushingBlow, // attack 22
+    GraveCleave,  // attack 6 x3
+    DreadRoar,    // Strength +3 + player Vulnerable 2
+    Bulwark,      // Block 18 + attack 10
 }
 
 impl EnemyMove {
@@ -82,6 +96,19 @@ impl EnemyMove {
             EnemyMove::TrollBellow => "Bellow",
             EnemyMove::Rush => "Rush",
             EnemyMove::SkullBash => "Skull Bash",
+            EnemyMove::Stab => "Stab",
+            EnemyMove::Rend => "Rend",
+            EnemyMove::Fester => "Fester",
+            EnemyMove::Peck => "Peck",
+            EnemyMove::Screech => "Screech",
+            EnemyMove::Maul => "Maul",
+            EnemyMove::SoulDrain => "Soul Drain",
+            EnemyMove::WarChant => "War-Chant",
+            EnemyMove::Cleave => "Cleave",
+            EnemyMove::CrushingBlow => "Crushing Blow",
+            EnemyMove::GraveCleave => "Grave Cleave",
+            EnemyMove::DreadRoar => "Dread Roar",
+            EnemyMove::Bulwark => "Bulwark",
         }
     }
 }
@@ -166,14 +193,54 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
                 return candidate;
             }
         }
-        // Act 1 bestiary — moves implemented in Task 2
-        Species::DraugrWarrior
-        | Species::MireCrawler
-        | Species::Hrafn
-        | Species::BarrowWight
-        | Species::DraugrWarlord
-        | Species::MoundJarl => {
-            unimplemented!("Act 1 bestiary moves not yet implemented")
+        Species::DraugrWarrior => loop {
+            let candidate = if rng.percent() < 60 { EnemyMove::Stab } else { EnemyMove::Rend };
+            if ran_consecutively(history, candidate, 2) {
+                continue;
+            }
+            return candidate;
+        },
+        Species::Hrafn => loop {
+            let candidate = if rng.percent() < 60 { EnemyMove::Peck } else { EnemyMove::Screech };
+            if ran_consecutively(history, candidate, 2) {
+                continue;
+            }
+            return candidate;
+        },
+        Species::MireCrawler => {
+            if first_turn {
+                return EnemyMove::Fester;
+            }
+            loop {
+                let candidate = if rng.percent() < 70 { EnemyMove::Bite } else { EnemyMove::Fester };
+                if candidate == EnemyMove::Fester && ran_consecutively(history, EnemyMove::Fester, 1) {
+                    continue;
+                }
+                return candidate;
+            }
+        }
+        Species::BarrowWight => {
+            if first_turn {
+                return EnemyMove::SoulDrain;
+            }
+            loop {
+                let candidate = if rng.percent() < 70 { EnemyMove::Maul } else { EnemyMove::SoulDrain };
+                if candidate == EnemyMove::SoulDrain && ran_consecutively(history, EnemyMove::SoulDrain, 1) {
+                    continue;
+                }
+                return candidate;
+            }
+        }
+        Species::DraugrWarlord => {
+            if first_turn {
+                EnemyMove::WarChant
+            } else {
+                EnemyMove::Cleave
+            }
+        }
+        Species::MoundJarl => {
+            use EnemyMove::*;
+            [DreadRoar, CrushingBlow, GraveCleave, Bulwark][history.len() % 4]
         }
     }
 }
@@ -304,5 +371,58 @@ mod tests {
         assert_eq!(Species::DraugrWarlord.hp_range(), (86, 90));
         assert_eq!(Species::MoundJarl.name(), "The Mound Jarl");
         assert_eq!(Species::MoundJarl.hp_range(), (150, 150));
+    }
+
+    #[test]
+    fn warrior_alternates_within_repeat_rules() {
+        for seed in 0..10 {
+            let h = simulate(Species::DraugrWarrior, 300, seed);
+            assert!(max_consecutive(&h, EnemyMove::Stab) <= 2);
+            assert!(max_consecutive(&h, EnemyMove::Rend) <= 2);
+            assert!(h.contains(&EnemyMove::Stab) && h.contains(&EnemyMove::Rend));
+        }
+    }
+
+    #[test]
+    fn crawler_festers_first_then_mixes() {
+        let h = simulate(Species::MireCrawler, 300, 3);
+        assert_eq!(h[0], EnemyMove::Fester);
+        assert!(max_consecutive(&h, EnemyMove::Fester) <= 1);
+        assert!(h.contains(&EnemyMove::Bite));
+    }
+
+    #[test]
+    fn wight_drains_first_then_mauls() {
+        let h = simulate(Species::BarrowWight, 200, 5);
+        assert_eq!(h[0], EnemyMove::SoulDrain);
+        assert!(max_consecutive(&h, EnemyMove::SoulDrain) <= 1);
+        assert!(h.contains(&EnemyMove::Maul));
+    }
+
+    #[test]
+    fn warlord_chants_once_then_cleaves() {
+        let h = simulate(Species::DraugrWarlord, 10, 1);
+        assert_eq!(h[0], EnemyMove::WarChant);
+        assert!(h[1..].iter().all(|m| *m == EnemyMove::Cleave));
+    }
+
+    #[test]
+    fn jarl_rotation_is_fixed() {
+        let h = simulate(Species::MoundJarl, 8, 1);
+        use EnemyMove::*;
+        assert_eq!(
+            h,
+            vec![DreadRoar, CrushingBlow, GraveCleave, Bulwark, DreadRoar, CrushingBlow, GraveCleave, Bulwark]
+        );
+    }
+
+    #[test]
+    fn hrafn_uses_both_moves_within_repeat_rules() {
+        for seed in 0..10 {
+            let h = simulate(Species::Hrafn, 300, seed);
+            assert!(max_consecutive(&h, EnemyMove::Peck) <= 2);
+            assert!(max_consecutive(&h, EnemyMove::Screech) <= 2);
+            assert!(h.contains(&EnemyMove::Peck) && h.contains(&EnemyMove::Screech));
+        }
     }
 }
