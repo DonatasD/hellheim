@@ -5,6 +5,13 @@ pub enum Species {
     BarrowRat,     // StS Red Louse
     FenRat,        // StS Green Louse
     ForestTroll,   // StS Gremlin Nob (elite)
+    // Act 1 map bestiary:
+    DraugrWarrior, // StS Blue Slaver
+    MireCrawler,   // StS Fungi Beast
+    Hrafn,         // carrion crow
+    BarrowWight,   // StS Lagavulin (elite)
+    DraugrWarlord, // elite
+    MoundJarl,     // Act 1 boss
 }
 
 impl Species {
@@ -15,6 +22,12 @@ impl Species {
             Species::BarrowRat => "Barrow Rat",
             Species::FenRat => "Fen Rat",
             Species::ForestTroll => "Forest Troll",
+            Species::DraugrWarrior => "Draugr Warrior",
+            Species::MireCrawler => "Mire Crawler",
+            Species::Hrafn => "Hrafn",
+            Species::BarrowWight => "Barrow Wight",
+            Species::DraugrWarlord => "Draugr Warlord",
+            Species::MoundJarl => "The Mound Jarl",
         }
     }
 
@@ -26,6 +39,12 @@ impl Species {
             Species::BarrowRat => (10, 15),
             Species::FenRat => (11, 17),
             Species::ForestTroll => (82, 86),
+            Species::DraugrWarrior => (46, 50),
+            Species::MireCrawler => (22, 28),
+            Species::Hrafn => (30, 34),
+            Species::BarrowWight => (85, 90),
+            Species::DraugrWarlord => (86, 90),
+            Species::MoundJarl => (150, 150),
         }
     }
 }
@@ -147,6 +166,15 @@ pub fn roll_move(species: Species, history: &[EnemyMove], rng: &mut RunRng) -> E
                 return candidate;
             }
         }
+        // Act 1 bestiary — moves implemented in Task 2
+        Species::DraugrWarrior
+        | Species::MireCrawler
+        | Species::Hrafn
+        | Species::BarrowWight
+        | Species::DraugrWarlord
+        | Species::MoundJarl => {
+            unimplemented!("Act 1 bestiary moves not yet implemented")
+        }
     }
 }
 
@@ -264,5 +292,17 @@ mod tests {
             simulate(Species::GraveWolf, 50, 1234),
             simulate(Species::GraveWolf, 50, 1234)
         );
+    }
+
+    #[test]
+    fn new_species_data_matches_spec() {
+        assert_eq!(Species::DraugrWarrior.name(), "Draugr Warrior");
+        assert_eq!(Species::DraugrWarrior.hp_range(), (46, 50));
+        assert_eq!(Species::MireCrawler.hp_range(), (22, 28));
+        assert_eq!(Species::Hrafn.hp_range(), (30, 34));
+        assert_eq!(Species::BarrowWight.hp_range(), (85, 90));
+        assert_eq!(Species::DraugrWarlord.hp_range(), (86, 90));
+        assert_eq!(Species::MoundJarl.name(), "The Mound Jarl");
+        assert_eq!(Species::MoundJarl.hp_range(), (150, 150));
     }
 }
