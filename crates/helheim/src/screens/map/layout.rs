@@ -1,6 +1,7 @@
 //! Pure map geometry & visual classification — no Bevy ECS, fully unit-tested.
 use bevy::prelude::*;
-use helheim_core::map::{NodeId, BOSS_FLOOR, MAP_WIDTH};
+use helheim_core::map::{NodeId, NodeKind, BOSS_FLOOR, MAP_WIDTH};
+use crate::theme;
 
 /// Vertical world units between floors.
 pub const FLOOR_GAP: f32 = 120.0;
@@ -69,6 +70,61 @@ pub fn keyboard_step(current: NodeId, reachable: &[NodeId], dir: i8) -> NodeId {
     sorted[(idx + dir as i32).rem_euclid(len) as usize]
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NodeVisual {
+    Current,
+    Reachable,
+    Visited,
+    Locked,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EdgeStyle {
+    Taken,     // road through already-climbed floors
+    Available, // leaves the current node to a reachable child
+    Ahead,     // unreached future road
+}
+
+/// Per-kind accent color for rings, icon tint, and glow.
+pub fn kind_color(kind: NodeKind) -> Color {
+    match kind {
+        NodeKind::Monster => Color::srgb(0.55, 0.56, 0.60), // steel
+        NodeKind::Elite => theme::ACCENT,                   // red
+        NodeKind::Rest => Color::srgb(0.95, 0.64, 0.23),    // warm orange
+        NodeKind::Treasure => theme::ENERGY_COLOR,          // gold
+        NodeKind::Boss => Color::srgb(0.89, 0.70, 0.29),    // bright gold
+    }
+}
+
+/// Classify a node for rendering, given where the player stands and what's reachable.
+pub fn node_visual(id: NodeId, current: Option<NodeId>, reachable: &[NodeId]) -> NodeVisual {
+    if Some(id) == current {
+        NodeVisual::Current
+    } else if reachable.contains(&id) {
+        NodeVisual::Reachable
+    } else if id.floor < current.map(|c| c.floor).unwrap_or(0) {
+        NodeVisual::Visited
+    } else {
+        NodeVisual::Locked
+    }
+}
+
+/// Classify an edge `from → to` for rendering.
+pub fn edge_style(
+    from: NodeId,
+    to: NodeId,
+    current: Option<NodeId>,
+    reachable: &[NodeId],
+) -> EdgeStyle {
+    if Some(from) == current && reachable.contains(&to) {
+        EdgeStyle::Available
+    } else if to.floor <= current.map(|c| c.floor).unwrap_or(0) {
+        EdgeStyle::Taken
+    } else {
+        EdgeStyle::Ahead
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,5 +177,36 @@ mod tests {
         assert_eq!(keyboard_step(r[0], &r, 1), r[1]);
         assert_eq!(keyboard_step(r[2], &r, 1), r[0]); // wrap forward
         assert_eq!(keyboard_step(r[0], &r, -1), r[2]); // wrap backward
+    }
+
+    #[test]
+    fn kind_color_is_distinct_and_themed() {
+        assert_eq!(kind_color(NodeKind::Elite), theme::ACCENT);
+        assert_ne!(kind_color(NodeKind::Monster), kind_color(NodeKind::Rest));
+    }
+
+    #[test]
+    fn node_visual_classifies_by_position_and_reach() {
+        let cur = NodeId { floor: 3, col: 2 };
+        let reach = vec![NodeId { floor: 4, col: 1 }, NodeId { floor: 4, col: 2 }];
+        assert_eq!(node_visual(cur, Some(cur), &reach), NodeVisual::Current);
+        assert_eq!(node_visual(reach[0], Some(cur), &reach), NodeVisual::Reachable);
+        assert_eq!(node_visual(NodeId { floor: 1, col: 0 }, Some(cur), &reach), NodeVisual::Visited);
+        assert_eq!(node_visual(NodeId { floor: 6, col: 0 }, Some(cur), &reach), NodeVisual::Locked);
+    }
+
+    #[test]
+    fn edge_style_classifies_taken_available_ahead() {
+        let cur = NodeId { floor: 3, col: 2 };
+        let reach = vec![NodeId { floor: 4, col: 2 }];
+        assert_eq!(edge_style(cur, reach[0], Some(cur), &reach), EdgeStyle::Available);
+        assert_eq!(
+            edge_style(NodeId { floor: 1, col: 0 }, NodeId { floor: 2, col: 0 }, Some(cur), &reach),
+            EdgeStyle::Taken
+        );
+        assert_eq!(
+            edge_style(NodeId { floor: 5, col: 0 }, NodeId { floor: 6, col: 0 }, Some(cur), &reach),
+            EdgeStyle::Ahead
+        );
     }
 }
