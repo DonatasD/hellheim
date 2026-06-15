@@ -217,6 +217,11 @@ fn clear_status(s: &mut Statuses, kind: StatusKind) {
 #[derive(Resource, Default)]
 pub struct EventQueue(pub VecDeque<CombatEvent>);
 
+/// Events produced by `enter_node` that the combat screen must drain into the
+/// `EventQueue` so the opening draw/intent animations play correctly.
+#[derive(Resource, Default)]
+pub struct PendingEvents(pub Vec<CombatEvent>);
+
 #[derive(Resource)]
 pub struct BeatTimer(pub Timer);
 
@@ -239,6 +244,7 @@ pub struct AnimPlugin;
 impl Plugin for AnimPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EventQueue>()
+            .init_resource::<PendingEvents>()
             .insert_resource(BeatTimer(Timer::from_seconds(
                 BEAT_SECONDS,
                 TimerMode::Repeating,

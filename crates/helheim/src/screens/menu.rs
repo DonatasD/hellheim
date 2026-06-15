@@ -60,7 +60,7 @@ fn begin_button(
                 commands.insert_resource(Session {
                     run: RunState::new(cli.next_seed()),
                 });
-                next.set(AppState::Combat);
+                next.set(AppState::Map);
             }
             Interaction::Hovered => *bg = BackgroundColor(theme::PANEL_HOVER),
             Interaction::None => *bg = BackgroundColor(theme::PANEL),

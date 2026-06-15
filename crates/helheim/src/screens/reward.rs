@@ -92,13 +92,13 @@ fn reward_clicks(
     for (interaction, button) in &cards {
         if *interaction == Interaction::Pressed && session.run.choose_reward(Some(button.0)).is_ok()
         {
-            next.set(AppState::Combat);
+            next.set(AppState::Map);
             return;
         }
     }
     for interaction in &skips {
         if *interaction == Interaction::Pressed && session.run.choose_reward(None).is_ok() {
-            next.set(AppState::Combat);
+            next.set(AppState::Map);
             return;
         }
     }

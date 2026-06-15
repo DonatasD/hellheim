@@ -9,6 +9,8 @@ mod theme;
 pub enum AppState {
     #[default]
     Menu,
+    Map,
+    Rest,
     Combat,
     Reward,
     Victory,
@@ -54,6 +56,8 @@ fn main() {
             theme::ThemePlugin,
             anim::AnimPlugin,
             screens::menu::MenuPlugin,
+            screens::map::MapPlugin,
+            screens::rest::RestPlugin,
             screens::combat::CombatScreenPlugin,
             screens::reward::RewardPlugin,
             screens::end::EndScreensPlugin,

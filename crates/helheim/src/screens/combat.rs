@@ -4,7 +4,7 @@ use helheim_core::combat::{Action, IntentKind, TargetRef};
 use helheim_core::run::Stage;
 use helheim_core::statuses::Statuses;
 
-use crate::anim::{queue_empty, DisplayState, EventQueue, PanelTarget};
+use crate::anim::{queue_empty, DisplayState, EventQueue, PanelTarget, PendingEvents};
 use crate::theme::{self, UiFont};
 use crate::{AppState, Session};
 
@@ -63,21 +63,16 @@ struct EndTurnButton;
 
 fn enter_combat(
     mut commands: Commands,
-    mut session: ResMut<Session>,
+    session: Res<Session>,
     mut queue: ResMut<EventQueue>,
+    mut pending: ResMut<PendingEvents>,
     font: Res<UiFont>,
 ) {
-    if session.run.combat.is_none() {
-        let events = session
-            .run
-            .begin_fight()
-            .expect("entered Combat outside a Fight stage");
-        let ds = DisplayState::new_for(&session.run);
-        queue.0.clear();
-        queue.0.extend(events);
-        spawn_combat_ui(&mut commands, &font, &ds);
-        commands.insert_resource(ds);
-    }
+    let ds = DisplayState::new_for(&session.run);
+    queue.0.clear();
+    queue.0.extend(pending.0.drain(..));
+    spawn_combat_ui(&mut commands, &font, &ds);
+    commands.insert_resource(ds);
 }
 
 fn exit_combat(
@@ -584,6 +579,6 @@ fn post_combat(
         Stage::Reward { .. } => next.set(AppState::Reward),
         Stage::Victory => next.set(AppState::Victory),
         Stage::Defeat => next.set(AppState::GameOver),
-        Stage::Fight(_) => {}
+        Stage::ChoosingNode => next.set(AppState::Map),
     }
 }

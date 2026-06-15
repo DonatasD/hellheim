@@ -111,7 +111,7 @@ fn end_clicks(
             commands.insert_resource(Session {
                 run: RunState::new(cli.next_seed()),
             });
-            next.set(AppState::Combat);
+            next.set(AppState::Map);
             return;
         }
     }
