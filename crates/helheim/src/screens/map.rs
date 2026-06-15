@@ -1,3 +1,5 @@
+pub mod layout;
+
 use bevy::prelude::*;
 use helheim_core::map::{NodeId, NodeKind, BOSS_FLOOR, MAP_FLOORS};
 
