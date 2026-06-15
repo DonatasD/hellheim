@@ -2,6 +2,7 @@
 
 pub mod cards;
 pub mod combat;
+pub mod encounters;
 pub mod enemies;
 pub mod map;
 pub mod rng;
