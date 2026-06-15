@@ -12,9 +12,9 @@ and fully unit-tested; the presentation is Bevy.
 
 ## Controls
 
-- Click a card to play it; click an enemy when a target is needed (Esc cancels)
-- `1`–`9`/`0` play cards, Tab/arrows cycle targets, Enter confirms
-- `E` or the button ends the turn
+- **Map:** click a highlighted node to travel to it
+- **Combat:** click a card to play it; click an enemy when a target is needed (Esc cancels); `1`–`9`/`0` play cards, Tab/arrows cycle targets, Enter confirms; `E` ends the turn
+- **Reward/Rest:** click to choose
 
 ## Test
 
@@ -27,7 +27,8 @@ and fully unit-tested; the presentation is Bevy.
 - `crates/helheim` — Bevy shell: screens, animation queue, theme
 - `docs/superpowers/specs/` — design specs; `docs/superpowers/plans/` — build plans
 
-Phase 1 ships the 3-fight Barrow Road gauntlet. The roadmap (map, relics,
-acts 2–3…) lives in the Phase 1 spec.
+Act 1 is a Slay-the-Spire-style branching map: climb ~15 floors through
+monsters, elites, rests, and treasure to the boss. Phase 2 specs 2–5 (gold &
+shops, card upgrades, events, save/continue) build on this foundation.
 
 Font: Fira Sans (SIL Open Font License).
