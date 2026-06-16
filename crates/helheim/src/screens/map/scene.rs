@@ -191,6 +191,9 @@ pub fn despawn_map(
     mut cameras: Query<&mut Transform, With<Camera2d>>,
 ) {
     commands.remove_resource::<MapSelection>();
+    // Belt-and-braces: today only `travel_token` leaves the map (and it clears
+    // this), but make teardown self-defending if another exit path is ever added.
+    commands.remove_resource::<super::Traveling>();
     for e in &q {
         commands.entity(e).despawn();
     }
