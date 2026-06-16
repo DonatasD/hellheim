@@ -8,6 +8,7 @@ use crate::Session;
 const TRAVEL_SECS: f32 = 0.45;
 
 /// Mouse + keyboard → start a travel. No-op while a travel is in progress.
+#[allow(clippy::too_many_arguments)]
 pub fn navigate(
     mut commands: Commands,
     session: Res<Session>,

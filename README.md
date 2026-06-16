@@ -12,7 +12,7 @@ and fully unit-tested; the presentation is Bevy.
 
 ## Controls
 
-- **Map:** click a highlighted node to travel to it
+- **Map:** click a highlighted node to travel, or use ←/→ to pick a node and Enter/↑ to travel; your token walks the road
 - **Combat:** click a card to play it; click an enemy when a target is needed (Esc cancels); `1`–`9`/`0` play cards, Tab/arrows cycle targets, Enter confirms; `E` ends the turn
 - **Reward/Rest:** click to choose
 
