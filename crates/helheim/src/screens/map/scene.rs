@@ -131,6 +131,20 @@ pub fn spawn_map(
         commands.entity(root).add_child(band);
     }
 
+    // Player token — walks the road during travel.
+    let token_pos = current
+        .map(layout::node_pos)
+        .unwrap_or(Vec2::new(0.0, layout::FLOOR_GAP));
+    let token = commands
+        .spawn((
+            super::PlayerToken,
+            Mesh2d(meshes.add(Circle::new(9.0))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(theme::ACCENT))),
+            Transform::from_xyz(token_pos.x, token_pos.y, 4.0),
+        ))
+        .id();
+    commands.entity(root).add_child(token);
+
     // HUD overlay (Bevy UI, screen-space, on top of the world scene).
     commands
         .spawn((

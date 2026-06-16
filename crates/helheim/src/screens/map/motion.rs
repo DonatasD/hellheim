@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
 use super::layout;
-use super::{GlowAura, MapNodeEnt, Reveal, Traveling};
+use super::{GlowAura, MapNodeEnt, PlayerToken, Reveal, Traveling};
+use crate::anim::PendingEvents;
+use crate::AppState;
 use crate::Session;
+use helheim_core::map::NodeKind;
 
 /// Entrance: scale each node 0 → 1, staggered by floor (bottom-first), then drop `Reveal`.
 pub fn reveal_nodes(
@@ -95,5 +98,59 @@ pub(super) fn cursor_node(
     layout::pick_node(world, &nodes)
 }
 
-/// Implemented in Task 9: walks the token along the curve and routes on arrival.
-pub fn travel_token() {}
+/// Walk the token along the curve; on completion enter the node and route.
+/// A click or Enter/Space while traveling fast-forwards (skips) the walk.
+#[allow(clippy::too_many_arguments)]
+pub fn travel_token(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut session: ResMut<Session>,
+    mut next: ResMut<NextState<AppState>>,
+    mut pending: ResMut<PendingEvents>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    traveling: Option<ResMut<Traveling>>,
+    mut tokens: Query<&mut Transform, With<PlayerToken>>,
+) {
+    let Some(mut trav) = traveling else {
+        return;
+    };
+
+    // Skip on a second confirm/click.
+    if mouse.just_pressed(MouseButton::Left)
+        || keys.just_pressed(KeyCode::Enter)
+        || keys.just_pressed(KeyCode::Space)
+    {
+        let dur = trav.timer.duration();
+        trav.timer.set_elapsed(dur);
+    }
+
+    trav.timer.tick(time.delta());
+    let t = trav.timer.fraction();
+    let to_pos = layout::node_pos(trav.to);
+    let p = layout::bezier_point_at(trav.from, to_pos, t);
+    if let Ok(mut tf) = tokens.single_mut() {
+        tf.translation.x = p.x;
+        tf.translation.y = p.y;
+    }
+
+    if !trav.timer.is_finished() {
+        return;
+    }
+
+    // Arrived: commit to the core and route, mirroring the original screen.
+    let to = trav.to;
+    let kind = session.run.map.node(to).kind;
+    match session.run.enter_node(to) {
+        Ok(events) => match kind {
+            NodeKind::Monster | NodeKind::Elite | NodeKind::Boss => {
+                pending.0 = events;
+                next.set(AppState::Combat);
+            }
+            NodeKind::Treasure => next.set(AppState::Reward),
+            NodeKind::Rest => next.set(AppState::Rest),
+        },
+        Err(err) => warn!("rejected node {to:?}: {err:?}"),
+    }
+    commands.remove_resource::<Traveling>();
+}
