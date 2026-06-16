@@ -186,4 +186,30 @@ pub fn despawn_map(
     }
 }
 
-pub fn draw_edges() {}
+pub fn draw_edges(mut gizmos: Gizmos, session: Res<Session>) {
+    let run = &session.run;
+    let reachable = run.available_nodes();
+    let current = run.position;
+
+    for node in run.map.all() {
+        let from = layout::node_pos(node.id);
+        for &to_id in &node.next {
+            let to = layout::node_pos(to_id);
+            let style = layout::edge_style(node.id, to_id, current, &reachable);
+            let color = match style {
+                layout::EdgeStyle::Available => Color::srgb(0.85, 0.62, 0.30),
+                layout::EdgeStyle::Taken => Color::srgb(0.42, 0.32, 0.22),
+                layout::EdgeStyle::Ahead => Color::srgb(0.22, 0.22, 0.28),
+            };
+            // Sample the curve, dropping points inside either node's rim so the
+            // line runs rim-to-rim with a small gap at each node.
+            let pts: Vec<Vec2> = layout::bezier_points(from, to, 24)
+                .into_iter()
+                .filter(|p| {
+                    p.distance(from) > layout::NODE_R + 2.0 && p.distance(to) > layout::NODE_R + 2.0
+                })
+                .collect();
+            gizmos.linestrip_2d(pts, color);
+        }
+    }
+}
