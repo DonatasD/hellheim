@@ -29,6 +29,7 @@ impl Plugin for MapPlugin {
                     motion::reveal_nodes,
                     motion::hover_lift,
                     motion::follow_camera,
+                    motion::scroll_camera,
                     input::navigate,
                     motion::travel_token,
                 )
@@ -103,6 +104,11 @@ pub struct Traveling {
     pub from: Vec2,
     pub timer: Timer,
 }
+
+/// Desired camera y; the wheel scrolls this and `follow_camera` eases toward it.
+/// Re-seeded to the current floor on enter, so travel and entry recenter the view.
+#[derive(Resource)]
+pub struct CameraTarget(pub f32);
 
 #[cfg(test)]
 mod tests {

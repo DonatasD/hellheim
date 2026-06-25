@@ -1,7 +1,8 @@
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 
 use super::layout;
-use super::{GlowAura, MapNodeEnt, PlayerToken, Reveal, Traveling};
+use super::{CameraTarget, GlowAura, MapNodeEnt, PlayerToken, Reveal, Traveling};
 use crate::anim::PendingEvents;
 use crate::AppState;
 use crate::Session;
@@ -59,22 +60,43 @@ pub fn hover_lift(
     }
 }
 
-/// Camera eases toward the floor in focus — the destination while traveling,
-/// else the current floor — so it pans up as you climb.
+/// Camera eases toward the focus point: the destination while traveling, else
+/// the scroll target (set by entry and `scroll_camera`). This lets the player
+/// scroll to preview the map while still auto-recentering on travel and entry.
 pub fn follow_camera(
     time: Res<Time>,
-    session: Res<Session>,
     traveling: Option<Res<Traveling>>,
+    target: Option<Res<CameraTarget>>,
     mut cameras: Query<&mut Transform, With<Camera2d>>,
 ) {
-    let floor = traveling
-        .map(|t| t.to.floor)
-        .or_else(|| session.run.position.map(|p| p.floor))
-        .unwrap_or(0);
-    let target = layout::camera_y_for(floor);
+    let goal = match (traveling, target) {
+        (Some(t), _) => layout::camera_y_for(t.to.floor),
+        (None, Some(t)) => t.0,
+        (None, None) => return,
+    };
     if let Ok(mut cam) = cameras.single_mut() {
         let dt = (time.delta_secs() * 4.0).min(1.0);
-        cam.translation.y += (target - cam.translation.y) * dt;
+        cam.translation.y += (goal - cam.translation.y) * dt;
+    }
+}
+
+/// Mouse wheel scrolls the camera target up/down within the map bounds so the
+/// player can preview floors ahead. Normalizes line- vs pixel-unit scrolling.
+pub fn scroll_camera(mut wheel: MessageReader<MouseWheel>, target: Option<ResMut<CameraTarget>>) {
+    let Some(mut target) = target else {
+        return;
+    };
+    let mut delta = 0.0;
+    let mut scrolled = false;
+    for ev in wheel.read() {
+        delta += match ev.unit {
+            MouseScrollUnit::Line => ev.y * 48.0,
+            MouseScrollUnit::Pixel => ev.y * 0.6,
+        };
+        scrolled = true;
+    }
+    if scrolled {
+        target.0 = layout::clamp_cam_y(target.0 + delta);
     }
 }
 

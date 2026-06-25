@@ -38,9 +38,14 @@ pub fn bezier_points(from: Vec2, to: Vec2, n: usize) -> Vec<Vec2> {
     (0..=n).map(|i| bezier_point_at(from, to, i as f32 / n as f32)).collect()
 }
 
+/// Clamp a world-y to the camera's vertical scroll bounds.
+pub fn clamp_cam_y(y: f32) -> f32 {
+    y.clamp(MIN_CAM_Y, MAX_CAM_Y)
+}
+
 /// Camera-follow target for a floor, clamped so the view never overscrolls.
 pub fn camera_y_for(floor: u8) -> f32 {
-    (floor as f32 * FLOOR_GAP).clamp(MIN_CAM_Y, MAX_CAM_Y)
+    clamp_cam_y(floor as f32 * FLOOR_GAP)
 }
 
 /// Nearest node whose center is within `NODE_R` of a world-space cursor point.
@@ -128,6 +133,14 @@ pub fn edge_style(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clamp_cam_y_holds_scroll_bounds() {
+        assert_eq!(clamp_cam_y(-999.0), MIN_CAM_Y);
+        assert_eq!(clamp_cam_y(999_999.0), MAX_CAM_Y);
+        let mid = (MIN_CAM_Y + MAX_CAM_Y) * 0.5;
+        assert_eq!(clamp_cam_y(mid), mid);
+    }
 
     #[test]
     fn node_pos_climbs_and_centers() {

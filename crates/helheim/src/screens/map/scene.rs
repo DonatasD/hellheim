@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use helheim_core::map::BOSS_FLOOR;
 
 use super::layout::{self, NodeVisual};
-use super::{GlowAura, MapAssets, MapNodeEnt, MapScene, MapSelection, Reveal};
+use super::{CameraTarget, GlowAura, MapAssets, MapNodeEnt, MapScene, MapSelection, Reveal};
 use crate::theme::{self, UiFont};
 use crate::Session;
 
@@ -32,10 +32,12 @@ pub fn spawn_map(
     let current = run.position;
     let cur_floor = current.map(|c| c.floor).unwrap_or(0);
 
-    // Frame the camera on the current floor.
+    // Frame the camera on the current floor, and seed the scroll target there.
+    let cam_y = layout::camera_y_for(cur_floor);
+    commands.insert_resource(CameraTarget(cam_y));
     if let Ok(mut cam) = cameras.single_mut() {
         cam.translation.x = 0.0;
-        cam.translation.y = layout::camera_y_for(cur_floor);
+        cam.translation.y = cam_y;
     }
 
     // Seed keyboard selection to the lowest-column reachable node.
@@ -194,6 +196,7 @@ pub fn despawn_map(
     // Belt-and-braces: today only `travel_token` leaves the map (and it clears
     // this), but make teardown self-defending if another exit path is ever added.
     commands.remove_resource::<super::Traveling>();
+    commands.remove_resource::<CameraTarget>();
     for e in &q {
         commands.entity(e).despawn();
     }
