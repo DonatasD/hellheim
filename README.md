@@ -32,4 +32,4 @@ monsters, elites, rests, and treasure to the boss. Phase 2 specs 2–5 (gold &
 shops, card upgrades, events, save/continue) build on this foundation.
 
 Font: Fira Sans (SIL Open Font License).
-Icons: placeholder art — see [CREDITS.md](CREDITS.md) (to be replaced with game-icons.net, CC BY 3.0).
+Icons: original generated silhouettes — see [CREDITS.md](CREDITS.md) (regenerate with `tools/gen_map_icons.py`).
