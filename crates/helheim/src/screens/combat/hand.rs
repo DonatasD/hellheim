@@ -25,6 +25,21 @@ pub struct Card {
 #[derive(Component)]
 pub struct CardScrim;
 
+/// Draw-in animation in progress.
+#[derive(Component)]
+pub struct CardEnter {
+    pub timer: Timer,
+}
+
+/// Fly-to-discard animation in progress (then despawn).
+#[derive(Component)]
+pub struct CardFlyOut {
+    pub timer: Timer,
+}
+
+pub const ENTER_SECS: f32 = 0.32;
+pub const FLYOUT_SECS: f32 = 0.40;
+
 const CARD_W: f32 = 138.0;
 const CARD_H: f32 = 178.0;
 
@@ -120,25 +135,65 @@ pub fn spawn_card(
         .id()
 }
 
-/// Rebuild the whole hand on display change (replaced by reconcile in a later task).
-pub fn rebuild_hand(
+/// Reconcile card entities against the event stream: spawn drawn cards (with a
+/// draw-in animation), fly out played/discarded cards, and keep slots in sync.
+#[allow(clippy::too_many_arguments)]
+pub fn reconcile_hand(
     mut commands: Commands,
     ds: Res<DisplayState>,
     font: Res<UiFont>,
     assets: Res<CardAssets>,
     row: Query<Entity, With<HandRow>>,
-    existing: Query<Entity, With<Card>>,
+    mut flow: MessageReader<crate::anim::CardFlow>,
+    mut cards: Query<(Entity, &mut Card), Without<CardFlyOut>>,
+) {
+    let Ok(row) = row.single() else { return };
+    for f in flow.read() {
+        match *f {
+            crate::anim::CardFlow::Drawn(card) => {
+                let slot = cards.iter().count();
+                let e = spawn_card(&mut commands, &font, &assets, card, slot, ds.energy);
+                commands.entity(e).insert(CardEnter { timer: Timer::from_seconds(ENTER_SECS, TimerMode::Once) });
+                commands.entity(row).add_child(e);
+            }
+            crate::anim::CardFlow::Played { slot } => {
+                for (e, mut card) in &mut cards {
+                    if card.slot == slot {
+                        commands.entity(e).remove::<Button>().insert(CardFlyOut {
+                            timer: Timer::from_seconds(FLYOUT_SECS, TimerMode::Once),
+                        });
+                    } else if card.slot > slot {
+                        card.slot -= 1;
+                    }
+                }
+            }
+            crate::anim::CardFlow::Discarded => {
+                for (e, _) in &mut cards {
+                    commands.entity(e).remove::<Button>().insert(CardFlyOut {
+                        timer: Timer::from_seconds(FLYOUT_SECS, TimerMode::Once),
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Darken cards the player can't currently afford (scrim alpha), on energy change.
+pub fn refresh_affordability(
+    ds: Res<DisplayState>,
+    cards: Query<(&Card, &Children)>,
+    mut scrims: Query<&mut BackgroundColor, With<CardScrim>>,
 ) {
     if !ds.is_changed() {
         return;
     }
-    let Ok(row) = row.single() else { return };
-    for e in &existing {
-        commands.entity(e).despawn();
-    }
-    for (i, card) in ds.hand.iter().enumerate() {
-        let e = spawn_card(&mut commands, &font, &assets, *card, i, ds.energy);
-        commands.entity(row).add_child(e);
+    for (card, children) in &cards {
+        let unaffordable = card.card.spec().cost > ds.energy;
+        for child in children.iter() {
+            if let Ok(mut bg) = scrims.get_mut(child) {
+                bg.0 = bg.0.with_alpha(if unaffordable { 0.5 } else { 0.0 });
+            }
+        }
     }
 }
 

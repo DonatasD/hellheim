@@ -26,7 +26,7 @@ impl Plugin for CombatScreenPlugin {
                     (card_click, enemy_click, end_turn_button, keyboard)
                         .run_if(in_state(AppState::Combat))
                         .run_if(queue_empty),
-                    (sync_texts, hand::rebuild_hand, highlight_enemies, post_combat)
+                    (hand::reconcile_hand, hand::refresh_affordability, sync_texts, highlight_enemies, post_combat)
                         .run_if(in_state(AppState::Combat)),
                 ),
             );
