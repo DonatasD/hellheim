@@ -26,7 +26,7 @@ impl Plugin for CombatScreenPlugin {
                     (card_click, enemy_click, end_turn_button, keyboard)
                         .run_if(in_state(AppState::Combat))
                         .run_if(queue_empty),
-                    (sync_texts, rebuild_hand, highlight_enemies, post_combat)
+                    (sync_texts, hand::rebuild_hand, highlight_enemies, post_combat)
                         .run_if(in_state(AppState::Combat)),
                 ),
             );
@@ -57,10 +57,7 @@ enum Bind {
 }
 
 #[derive(Component)]
-struct HandRow;
-
-#[derive(Component)]
-struct CardButton(usize);
+pub(crate) struct HandRow;
 
 #[derive(Component)]
 struct EndTurnButton;
@@ -307,62 +304,6 @@ fn block_line(block: u32) -> String {
     }
 }
 
-fn rebuild_hand(
-    mut commands: Commands,
-    ds: Res<DisplayState>,
-    font: Res<UiFont>,
-    row: Query<Entity, With<HandRow>>,
-    existing: Query<Entity, With<CardButton>>,
-) {
-    if !ds.is_changed() {
-        return;
-    }
-    let Ok(row) = row.single() else { return };
-    for e in &existing {
-        commands.entity(e).despawn();
-    }
-    for (i, card) in ds.hand.iter().enumerate() {
-        let spec = card.spec();
-        let affordable = spec.cost <= ds.energy;
-        let bg = if affordable {
-            theme::PANEL
-        } else {
-            theme::PANEL_DIM
-        };
-        let label = if i < 9 {
-            format!("[{}]", i + 1)
-        } else {
-            "[0]".into()
-        };
-        let button = commands
-            .spawn((
-                CardButton(i),
-                Button,
-                Node {
-                    width: Val::Px(150.),
-                    height: Val::Px(170.),
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::SpaceBetween,
-                    padding: UiRect::all(Val::Px(10.)),
-                    ..default()
-                },
-                BackgroundColor(bg),
-            ))
-            .with_children(|c| {
-                c.spawn(theme::text(
-                    &font,
-                    format!("({}) {}", spec.cost, spec.name),
-                    17.,
-                    theme::TEXT,
-                ));
-                c.spawn(theme::text(&font, spec.text, 14., theme::TEXT_DIM));
-                c.spawn(theme::text(&font, label, 13., theme::TEXT_DIM));
-            })
-            .id();
-        commands.entity(row).add_child(button);
-    }
-}
-
 /// Highlight valid targets while a card is pending (and the keyboard cursor).
 fn highlight_enemies(
     ds: Res<DisplayState>,
@@ -441,18 +382,11 @@ fn card_click(
     mut cursor: ResMut<TargetCursor>,
     mut session: ResMut<Session>,
     mut queue: ResMut<EventQueue>,
-    buttons: Query<(&Interaction, &CardButton), Changed<Interaction>>,
+    cards: Query<(&Interaction, &hand::Card), Changed<Interaction>>,
 ) {
-    for (interaction, button) in &buttons {
+    for (interaction, card) in &cards {
         if *interaction == Interaction::Pressed {
-            try_play(
-                button.0,
-                &ds,
-                &mut pending,
-                &mut cursor,
-                &mut session,
-                &mut queue,
-            );
+            try_play(card.slot, &ds, &mut pending, &mut cursor, &mut session, &mut queue);
         }
     }
 }
