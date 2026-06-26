@@ -8,10 +8,14 @@ use crate::anim::{queue_empty, DisplayState, EventQueue, PanelTarget, PendingEve
 use crate::theme::{self, UiFont};
 use crate::{AppState, Session};
 
+pub mod hand;
+
 pub struct CombatScreenPlugin;
 
 impl Plugin for CombatScreenPlugin {
     fn build(&self, app: &mut App) {
+        let card_assets = hand::CardAssets::load(app.world().resource::<AssetServer>());
+        app.insert_resource(card_assets);
         app.init_resource::<PendingCard>()
             .init_resource::<TargetCursor>()
             .add_systems(OnEnter(AppState::Combat), enter_combat)
@@ -580,5 +584,29 @@ fn post_combat(
         Stage::Victory => next.set(AppState::Victory),
         Stage::Defeat => next.set(AppState::GameOver),
         Stage::ChoosingNode => next.set(AppState::Map),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::ThemePlugin;
+    use crate::{CliSeed, Session};
+    use bevy::asset::AssetPlugin;
+    use bevy::state::app::StatesPlugin;
+    use helheim_core::run::RunState;
+
+    #[test]
+    fn card_assets_load_at_plugin_build() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), StatesPlugin));
+        app.init_asset::<bevy::text::Font>();
+        app.init_asset::<Image>();
+        app.init_state::<AppState>();
+        app.insert_resource(CliSeed(Some(0)));
+        app.insert_resource(Session { run: RunState::new(0) });
+        app.add_plugins((ThemePlugin, crate::anim::AnimPlugin, CombatScreenPlugin));
+        app.update();
+        assert!(app.world().contains_resource::<hand::CardAssets>());
     }
 }
