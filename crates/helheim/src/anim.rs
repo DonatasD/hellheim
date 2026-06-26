@@ -10,6 +10,25 @@ use crate::theme::{self, UiFont};
 
 pub const BEAT_SECONDS: f32 = 0.18;
 
+/// A hand-level change derived from the combat event stream — lets the hand
+/// renderer animate exactly the card that drew/played/discarded.
+#[derive(Message, Clone, Copy, Debug, PartialEq)]
+pub enum CardFlow {
+    Drawn(CardId),
+    Played { slot: usize },
+    Discarded,
+}
+
+/// Pure: map a core combat event to a hand-flow message, if it affects the hand.
+pub fn card_flow(ev: &CombatEvent) -> Option<CardFlow> {
+    match *ev {
+        CombatEvent::CardDrawn { card } => Some(CardFlow::Drawn(card)),
+        CombatEvent::CardPlayed { hand_index, .. } => Some(CardFlow::Played { slot: hand_index }),
+        CombatEvent::HandDiscarded => Some(CardFlow::Discarded),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct EnemyView {
     pub name: &'static str,
@@ -243,7 +262,8 @@ pub struct AnimPlugin;
 
 impl Plugin for AnimPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<EventQueue>()
+        app.add_message::<CardFlow>()
+            .init_resource::<EventQueue>()
             .init_resource::<PendingEvents>()
             .insert_resource(BeatTimer(Timer::from_seconds(
                 BEAT_SECONDS,
@@ -305,6 +325,7 @@ fn drain_queue(
     mut commands: Commands,
     font: Res<UiFont>,
     panels: Query<(Entity, &PanelTarget)>,
+    mut flow: MessageWriter<CardFlow>,
 ) {
     timer.0.tick(time.delta());
     if queue.0.is_empty() || !timer.0.just_finished() {
@@ -313,6 +334,9 @@ fn drain_queue(
     while let Some(ev) = queue.0.pop_front() {
         let visual = beat_visual(&ev);
         let beat = is_beat(&ev);
+        if let Some(f) = card_flow(&ev) {
+            flow.write(f);
+        }
         apply_event(&mut ds, &ev);
         if let Some((target, text, color)) = visual {
             if let Some((panel, _)) = panels.iter().find(|(_, p)| p.0 == target) {
@@ -543,6 +567,18 @@ mod tests {
 
         apply_event(&mut ds, &CombatEvent::Victory);
         assert_eq!(ds.outcome, Some(Outcome::Victory));
+    }
+
+    #[test]
+    fn card_flow_maps_only_hand_events() {
+        assert_eq!(card_flow(&CombatEvent::CardDrawn { card: CardId::Hew }), Some(CardFlow::Drawn(CardId::Hew)));
+        assert_eq!(
+            card_flow(&CombatEvent::CardPlayed { card: CardId::Hew, hand_index: 2 }),
+            Some(CardFlow::Played { slot: 2 })
+        );
+        assert_eq!(card_flow(&CombatEvent::HandDiscarded), Some(CardFlow::Discarded));
+        assert_eq!(card_flow(&CombatEvent::DeckShuffled), None);
+        assert_eq!(card_flow(&CombatEvent::CardAddedToDiscard { card: CardId::Hew }), None);
     }
 
     #[test]
