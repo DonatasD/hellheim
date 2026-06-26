@@ -138,6 +138,32 @@ def icon_boss():
     return b
 
 
+def icon_sword():
+    """Attack — an upright sword."""
+    b = blank()
+    fill_poly(b, [(50, 10), (56, 22), (56, 60), (44, 60), (44, 22)], 1)  # blade
+    fill_poly(b, rect(34, 60, 66, 67), 1)                                # crossguard
+    fill_poly(b, rect(46, 67, 54, 84), 1)                                # grip
+    fill_circle(b, 50, 87, 5, 1)                                         # pommel
+    return b
+
+
+def icon_shield():
+    """Skill — a shield."""
+    b = blank()
+    fill_poly(b, [(50, 11), (80, 21), (80, 45), (69, 71), (50, 87),
+                  (31, 71), (20, 45), (20, 21)], 1)
+    return b
+
+
+def icon_sparkle():
+    """Power — a four-point star."""
+    b = blank()
+    fill_poly(b, [(50, 7), (57, 43), (93, 50), (57, 57), (50, 93),
+                  (43, 57), (7, 50), (43, 43)], 1)
+    return b
+
+
 # ---- PNG output ----
 
 def write_rgba(path, buf):
@@ -202,6 +228,12 @@ def main():
              ("treasure", icon_treasure), ("boss", icon_boss)]
     bufs = []
     for name, fn in order:
+        buf = fn()
+        bufs.append(buf)
+        write_rgba(os.path.join(icons_dir, name + ".png"), buf)
+        print("wrote", name + ".png")
+    card_order = [("card_attack", icon_sword), ("card_skill", icon_shield), ("card_power", icon_sparkle)]
+    for name, fn in card_order:
         buf = fn()
         bufs.append(buf)
         write_rgba(os.path.join(icons_dir, name + ".png"), buf)
