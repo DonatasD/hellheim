@@ -317,6 +317,7 @@ fn is_beat(ev: &CombatEvent) -> bool {
 }
 
 /// Pop events each beat: bookkeeping applies instantly, beat events pause.
+#[allow(clippy::too_many_arguments)]
 fn drain_queue(
     time: Res<Time>,
     mut timer: ResMut<BeatTimer>,

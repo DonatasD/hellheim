@@ -2,7 +2,6 @@ use bevy::prelude::*;
 
 pub const BG: Color = Color::srgb(0.07, 0.07, 0.10);
 pub const PANEL: Color = Color::srgb(0.14, 0.14, 0.19);
-pub const PANEL_DIM: Color = Color::srgb(0.10, 0.10, 0.13);
 pub const PANEL_HOVER: Color = Color::srgb(0.22, 0.22, 0.30);
 pub const ACCENT: Color = Color::srgb(0.78, 0.22, 0.20);
 pub const TEXT: Color = Color::srgb(0.92, 0.90, 0.85);

@@ -8,7 +8,7 @@ use crate::anim::{queue_empty, DisplayState, EventQueue, PanelTarget, PendingEve
 use crate::theme::{self, UiFont};
 use crate::{AppState, Session};
 
-pub mod hand;
+mod hand;
 
 pub struct CombatScreenPlugin;
 

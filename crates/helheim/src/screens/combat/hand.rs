@@ -181,7 +181,7 @@ pub fn reconcile_hand(
 /// Darken cards the player can't currently afford (scrim alpha), on energy change.
 pub fn refresh_affordability(
     ds: Res<DisplayState>,
-    cards: Query<(&Card, &Children)>,
+    cards: Query<(&Card, &Children), Without<CardFlyOut>>,
     mut scrims: Query<&mut BackgroundColor, With<CardScrim>>,
 ) {
     if !ds.is_changed() {
@@ -236,7 +236,7 @@ pub fn animate_enter(
 }
 
 /// Move `current` a frame-rate-scaled fraction toward `target` (cap at 1.0).
-pub fn approach(current: f32, target: f32, rate_dt: f32) -> f32 {
+pub(crate) fn approach(current: f32, target: f32, rate_dt: f32) -> f32 {
     current + (target - current) * rate_dt.min(1.0)
 }
 
@@ -245,6 +245,7 @@ const HOVER_LIFT: f32 = -14.0;
 
 /// Hovered settled card eases up + scales; others settle back to identity.
 /// Skips the pending card so `pulse_pending` owns its scale.
+#[allow(clippy::type_complexity)]
 pub fn hover_cards(
     time: Res<Time>,
     pending: Res<super::PendingCard>,
@@ -266,10 +267,11 @@ pub fn hover_cards(
 }
 
 /// The card awaiting an enemy target pulses (scale + brightened border).
+#[allow(clippy::type_complexity)]
 pub fn pulse_pending(
     time: Res<Time>,
     pending: Res<super::PendingCard>,
-    mut cards: Query<(&Card, &mut UiTransform, &mut BorderColor), Without<CardFlyOut>>,
+    mut cards: Query<(&Card, &mut UiTransform, &mut BorderColor), (Without<CardFlyOut>, Without<CardEnter>)>,
 ) {
     let wave = (time.elapsed_secs() * 6.0).sin() * 0.5 + 0.5; // 0..1
     for (card, mut tf, mut border) in &mut cards {
