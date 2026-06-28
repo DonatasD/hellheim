@@ -197,6 +197,26 @@ pub fn refresh_affordability(
     }
 }
 
+/// Slide a freshly drawn card in from the draw pile (lower-left) to rest.
+pub fn animate_enter(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut cards: Query<(Entity, &mut CardEnter, &mut UiTransform)>,
+) {
+    for (e, mut enter, mut tf) in &mut cards {
+        enter.timer.tick(time.delta());
+        let t = enter.timer.fraction();
+        let ease = t * t * (3.0 - 2.0 * t); // smoothstep
+        tf.translation = Val2::px(-280.0 * (1.0 - ease), 120.0 * (1.0 - ease));
+        tf.scale = Vec2::splat(0.5 + 0.5 * ease);
+        if enter.timer.is_finished() {
+            tf.translation = Val2::px(0.0, 0.0);
+            tf.scale = Vec2::ONE;
+            commands.entity(e).remove::<CardEnter>();
+        }
+    }
+}
+
 /// Move `current` a frame-rate-scaled fraction toward `target` (cap at 1.0).
 pub fn approach(current: f32, target: f32, rate_dt: f32) -> f32 {
     current + (target - current) * rate_dt.min(1.0)
