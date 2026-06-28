@@ -197,6 +197,24 @@ pub fn refresh_affordability(
     }
 }
 
+/// Fly a played/discarded card to the discard pile (lower-right), then despawn.
+pub fn animate_flyout(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut cards: Query<(Entity, &mut CardFlyOut, &mut Node, &mut UiTransform)>,
+) {
+    for (e, mut out, mut node, mut tf) in &mut cards {
+        node.position_type = PositionType::Absolute; // pop out of the row so the rest reflow
+        out.timer.tick(time.delta());
+        let t = out.timer.fraction();
+        tf.translation = Val2::px(320.0 * t, 130.0 * t);
+        tf.scale = Vec2::splat(1.0 - 0.65 * t);
+        if out.timer.is_finished() {
+            commands.entity(e).despawn();
+        }
+    }
+}
+
 /// Slide a freshly drawn card in from the draw pile (lower-left) to rest.
 pub fn animate_enter(
     time: Res<Time>,
