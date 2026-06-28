@@ -197,6 +197,36 @@ pub fn refresh_affordability(
     }
 }
 
+/// Move `current` a frame-rate-scaled fraction toward `target` (cap at 1.0).
+pub fn approach(current: f32, target: f32, rate_dt: f32) -> f32 {
+    current + (target - current) * rate_dt.min(1.0)
+}
+
+const HOVER_SCALE: f32 = 1.09;
+const HOVER_LIFT: f32 = -14.0;
+
+/// Hovered settled card eases up + scales; others settle back to identity.
+pub fn hover_cards(
+    time: Res<Time>,
+    mut cards: Query<(&Interaction, &mut UiTransform), (With<Card>, Without<CardEnter>, Without<CardFlyOut>)>,
+) {
+    let dt = time.delta_secs() * 14.0;
+    for (interaction, mut tf) in &mut cards {
+        let hot = matches!(interaction, Interaction::Hovered | Interaction::Pressed);
+        let ts = if hot { HOVER_SCALE } else { 1.0 };
+        let ty = if hot { HOVER_LIFT } else { 0.0 };
+        let s = approach(tf.scale.x, ts, dt);
+        tf.scale = Vec2::splat(s);
+        let y = approach(px_y(&tf.translation), ty, dt);
+        tf.translation = Val2::px(0.0, y);
+    }
+}
+
+/// Read the px component of a `Val2`'s y (0 if not a `Px`).
+fn px_y(t: &Val2) -> f32 {
+    if let Val::Px(p) = t.y { p } else { 0.0 }
+}
+
 /// Card-type icon textures, loaded once and tinted per kind at spawn.
 #[derive(Resource)]
 pub struct CardAssets {
@@ -231,5 +261,15 @@ mod tests {
         assert_eq!(kind_color(CardKind::Attack), theme::ACCENT);
         assert_ne!(kind_color(CardKind::Attack), kind_color(CardKind::Skill));
         assert_ne!(kind_color(CardKind::Skill), kind_color(CardKind::Power));
+    }
+}
+
+#[cfg(test)]
+mod motion_tests {
+    use super::approach;
+    #[test]
+    fn approach_moves_toward_and_clamps() {
+        assert!((approach(0.0, 1.0, 0.5) - 0.5).abs() < 1e-6);
+        assert!((approach(0.0, 1.0, 5.0) - 1.0).abs() < 1e-6); // clamped
     }
 }
