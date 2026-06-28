@@ -244,12 +244,17 @@ const HOVER_SCALE: f32 = 1.09;
 const HOVER_LIFT: f32 = -14.0;
 
 /// Hovered settled card eases up + scales; others settle back to identity.
+/// Skips the pending card so `pulse_pending` owns its scale.
 pub fn hover_cards(
     time: Res<Time>,
-    mut cards: Query<(&Interaction, &mut UiTransform), (With<Card>, Without<CardEnter>, Without<CardFlyOut>)>,
+    pending: Res<super::PendingCard>,
+    mut cards: Query<(&Interaction, &Card, &mut UiTransform), (Without<CardEnter>, Without<CardFlyOut>)>,
 ) {
     let dt = time.delta_secs() * 14.0;
-    for (interaction, mut tf) in &mut cards {
+    for (interaction, card, mut tf) in &mut cards {
+        if pending.0 == Some(card.slot) {
+            continue;
+        }
         let hot = matches!(interaction, Interaction::Hovered | Interaction::Pressed);
         let ts = if hot { HOVER_SCALE } else { 1.0 };
         let ty = if hot { HOVER_LIFT } else { 0.0 };
@@ -257,6 +262,26 @@ pub fn hover_cards(
         tf.scale = Vec2::splat(s);
         let y = approach(px_y(&tf.translation), ty, dt);
         tf.translation = Val2::px(0.0, y);
+    }
+}
+
+/// The card awaiting an enemy target pulses (scale + brightened border).
+pub fn pulse_pending(
+    time: Res<Time>,
+    pending: Res<super::PendingCard>,
+    mut cards: Query<(&Card, &mut UiTransform, &mut BorderColor), Without<CardFlyOut>>,
+) {
+    let wave = (time.elapsed_secs() * 6.0).sin() * 0.5 + 0.5; // 0..1
+    for (card, mut tf, mut border) in &mut cards {
+        let base = kind_color(card.card.spec().kind);
+        if pending.0 == Some(card.slot) {
+            tf.scale = Vec2::splat(1.0 + 0.06 * wave);
+            // Mix base color toward white; Mix trait is in bevy::prelude via bevy_color
+            border.set_all(base.mix(&Color::WHITE, 0.3 + 0.4 * wave));
+        } else {
+            // Unconditionally restore — idempotent, avoids bordering comparison issues
+            border.set_all(base);
+        }
     }
 }
 

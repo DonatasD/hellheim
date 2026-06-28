@@ -26,7 +26,7 @@ impl Plugin for CombatScreenPlugin {
                     (card_click, enemy_click, end_turn_button, keyboard)
                         .run_if(in_state(AppState::Combat))
                         .run_if(queue_empty),
-                    (hand::reconcile_hand, hand::animate_enter, hand::animate_flyout, hand::refresh_affordability, hand::hover_cards, sync_texts, highlight_enemies, post_combat)
+                    (hand::reconcile_hand, hand::animate_enter, hand::animate_flyout, hand::refresh_affordability, hand::hover_cards, hand::pulse_pending.after(hand::hover_cards), sync_texts, highlight_enemies, post_combat)
                         .run_if(in_state(AppState::Combat)),
                 ),
             );
@@ -35,7 +35,7 @@ impl Plugin for CombatScreenPlugin {
 
 /// Hand index of a single-target card waiting for the player to pick an enemy.
 #[derive(Resource, Default)]
-struct PendingCard(Option<usize>);
+pub(crate) struct PendingCard(pub(crate) Option<usize>);
 
 /// Keyboard target cursor (index into ds.enemies) while a card is pending.
 #[derive(Resource, Default)]
