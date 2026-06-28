@@ -148,13 +148,14 @@ pub fn reconcile_hand(
     mut cards: Query<(Entity, &mut Card), Without<CardFlyOut>>,
 ) {
     let Ok(row) = row.single() else { return };
+    let mut next_slot = cards.iter().count();
     for f in flow.read() {
         match *f {
             crate::anim::CardFlow::Drawn(card) => {
-                let slot = cards.iter().count();
-                let e = spawn_card(&mut commands, &font, &assets, card, slot, ds.energy);
+                let e = spawn_card(&mut commands, &font, &assets, card, next_slot, ds.energy);
                 commands.entity(e).insert(CardEnter { timer: Timer::from_seconds(ENTER_SECS, TimerMode::Once) });
                 commands.entity(row).add_child(e);
+                next_slot += 1;
             }
             crate::anim::CardFlow::Played { slot } => {
                 for (e, mut card) in &mut cards {
@@ -166,6 +167,7 @@ pub fn reconcile_hand(
                         card.slot -= 1;
                     }
                 }
+                next_slot = next_slot.saturating_sub(1);
             }
             crate::anim::CardFlow::Discarded => {
                 for (e, _) in &mut cards {
@@ -173,6 +175,7 @@ pub fn reconcile_hand(
                         timer: Timer::from_seconds(FLYOUT_SECS, TimerMode::Once),
                     });
                 }
+                next_slot = 0;
             }
         }
     }
@@ -326,6 +329,84 @@ mod tests {
         assert_eq!(kind_color(CardKind::Attack), theme::ACCENT);
         assert_ne!(kind_color(CardKind::Attack), kind_color(CardKind::Skill));
         assert_ne!(kind_color(CardKind::Skill), kind_color(CardKind::Power));
+    }
+
+    /// Regression: when a full hand is dealt in a single frame, each drawn card
+    /// must receive a **distinct** slot.  Before the fix, `cards.iter().count()`
+    /// was called once per `Drawn` message inside the loop; because `Commands`
+    /// spawns are deferred and not visible to the query within the same system
+    /// run, every card got `slot = 0`.  After the fix a local counter is seeded
+    /// once and incremented, so the slots are 0, 1, 2, …
+    #[test]
+    fn drawn_cards_get_distinct_slots() {
+        use bevy::asset::AssetPlugin;
+        use bevy::ecs::prelude::Messages;
+        use crate::anim::{CardFlow, DisplayState};
+
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        // Asset types used by spawn_card
+        app.init_asset::<bevy::text::Font>();
+        app.init_asset::<Image>();
+
+        // Register the CardFlow message channel
+        app.add_message::<CardFlow>();
+
+        // Minimal display state: 3 energy so all test cards are affordable
+        let ds = DisplayState {
+            player_hp: 80,
+            player_max_hp: 80,
+            player_block: 0,
+            energy: 3,
+            statuses: Default::default(),
+            hand: Vec::new(),
+            draw_count: 3,
+            discard_count: 0,
+            enemies: Vec::new(),
+            outcome: None,
+            turn: 1,
+        };
+        app.insert_resource(ds);
+
+        // UiFont: just a default handle (asset won't be resolved in a headless test)
+        let font_handle = app.world().resource::<AssetServer>().load("fonts/FiraSans-Regular.ttf");
+        app.insert_resource(crate::theme::UiFont(font_handle));
+
+        // CardAssets: same — handles are never resolved in tests
+        let ca = CardAssets::load(app.world().resource::<AssetServer>());
+        app.insert_resource(ca);
+
+        // Spawn the HandRow entity that reconcile_hand queries for
+        app.world_mut().spawn(HandRow);
+
+        // Wire up the system under test
+        app.add_systems(bevy::app::Update, reconcile_hand);
+
+        // Write 3 Drawn messages before the first update
+        {
+            let mut msgs = app.world_mut().resource_mut::<Messages<CardFlow>>();
+            msgs.write(CardFlow::Drawn(helheim_core::cards::CardId::Hew));
+            msgs.write(CardFlow::Drawn(helheim_core::cards::CardId::Hew));
+            msgs.write(CardFlow::Drawn(helheim_core::cards::CardId::Hew));
+        }
+
+        // Single update: all three Drawn messages are processed in one system run
+        app.update();
+
+        // Collect the slot values of all spawned Card entities
+        let mut slots: Vec<usize> = app
+            .world_mut()
+            .query::<&Card>()
+            .iter(app.world())
+            .map(|c| c.slot)
+            .collect();
+        slots.sort_unstable();
+
+        assert_eq!(
+            slots,
+            vec![0, 1, 2],
+            "each drawn card must get a distinct slot; got {slots:?}"
+        );
     }
 }
 
