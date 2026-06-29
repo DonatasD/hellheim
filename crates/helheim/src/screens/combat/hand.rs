@@ -55,7 +55,7 @@ pub fn spawn_card(
 ) -> Entity {
     let spec = card.spec();
     let col = kind_color(spec.kind);
-    let icon = assets.for_kind(spec.kind);
+    let icon = assets.for_card(card);
     let unaffordable = spec.cost > energy;
     let hot = if slot < 9 { format!("[{}]", slot + 1) } else { "[0]".into() };
 
@@ -289,27 +289,57 @@ fn px_y(t: &Val2) -> f32 {
     if let Val::Px(p) = t.y { p } else { 0.0 }
 }
 
-/// Card-type icon textures, loaded once and tinted per kind at spawn.
+/// Per-card icon textures, loaded once and tinted by kind at spawn.
 #[derive(Resource)]
 pub struct CardAssets {
-    attack: Handle<Image>,
-    skill: Handle<Image>,
-    power: Handle<Image>,
+    hew: Handle<Image>,
+    raise_shield: Handle<Image>,
+    skull_splitter: Handle<Image>,
+    whirling_axe: Handle<Image>,
+    haft_strike: Handle<Image>,
+    unbowed: Handle<Image>,
+    shield_charge: Handle<Image>,
+    twin_axes: Handle<Image>,
+    rising_fury: Handle<Image>,
+    surge_of_rage: Handle<Image>,
+    berserkergang: Handle<Image>,
+    thors_wrath: Handle<Image>,
 }
 
 impl CardAssets {
     pub fn load(server: &AssetServer) -> Self {
         CardAssets {
-            attack: server.load("icons/card_attack.png"),
-            skill: server.load("icons/card_skill.png"),
-            power: server.load("icons/card_power.png"),
+            hew: server.load("icons/card_hew.png"),
+            raise_shield: server.load("icons/card_raise_shield.png"),
+            skull_splitter: server.load("icons/card_skull_splitter.png"),
+            whirling_axe: server.load("icons/card_whirling_axe.png"),
+            haft_strike: server.load("icons/card_haft_strike.png"),
+            unbowed: server.load("icons/card_unbowed.png"),
+            shield_charge: server.load("icons/card_shield_charge.png"),
+            twin_axes: server.load("icons/card_twin_axes.png"),
+            rising_fury: server.load("icons/card_rising_fury.png"),
+            surge_of_rage: server.load("icons/card_surge_of_rage.png"),
+            berserkergang: server.load("icons/card_berserkergang.png"),
+            thors_wrath: server.load("icons/card_thors_wrath.png"),
         }
     }
-    pub fn for_kind(&self, kind: CardKind) -> Handle<Image> {
-        match kind {
-            CardKind::Attack => self.attack.clone(),
-            CardKind::Skill => self.skill.clone(),
-            CardKind::Power => self.power.clone(),
+
+    /// Icon for a specific card. Exhaustive — a new `CardId` won't compile until
+    /// it has an icon here.
+    pub fn for_card(&self, card: CardId) -> Handle<Image> {
+        match card {
+            CardId::Hew => self.hew.clone(),
+            CardId::RaiseShield => self.raise_shield.clone(),
+            CardId::SkullSplitter => self.skull_splitter.clone(),
+            CardId::WhirlingAxe => self.whirling_axe.clone(),
+            CardId::HaftStrike => self.haft_strike.clone(),
+            CardId::Unbowed => self.unbowed.clone(),
+            CardId::ShieldCharge => self.shield_charge.clone(),
+            CardId::TwinAxes => self.twin_axes.clone(),
+            CardId::RisingFury => self.rising_fury.clone(),
+            CardId::SurgeOfRage => self.surge_of_rage.clone(),
+            CardId::Berserkergang => self.berserkergang.clone(),
+            CardId::ThorsWrath => self.thors_wrath.clone(),
         }
     }
 }

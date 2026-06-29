@@ -138,29 +138,131 @@ def icon_boss():
     return b
 
 
-def icon_sword():
-    """Attack — an upright sword."""
+# ---- per-card icons (tinted by kind at runtime) ----
+
+def card_hew():
+    """Hew — a single upright blade."""
     b = blank()
     fill_poly(b, [(50, 10), (56, 22), (56, 60), (44, 60), (44, 22)], 1)  # blade
-    fill_poly(b, rect(34, 60, 66, 67), 1)                                # crossguard
+    fill_poly(b, rect(34, 60, 66, 67), 1)                                # guard
     fill_poly(b, rect(46, 67, 54, 84), 1)                                # grip
-    fill_circle(b, 50, 87, 5, 1)                                         # pommel
+    fill_circle(b, 50, 86, 5, 1)                                         # pommel
     return b
 
 
-def icon_shield():
-    """Skill — a shield."""
+def card_raise_shield():
+    """Raise Shield — a kite shield."""
     b = blank()
     fill_poly(b, [(50, 11), (80, 21), (80, 45), (69, 71), (50, 87),
                   (31, 71), (20, 45), (20, 21)], 1)
     return b
 
 
-def icon_sparkle():
-    """Power — a four-point star."""
+def card_skull_splitter():
+    """Skull-Splitter — a cracked skull."""
     b = blank()
-    fill_poly(b, [(50, 7), (57, 43), (93, 50), (57, 57), (50, 93),
-                  (43, 57), (7, 50), (43, 43)], 1)
+    fill_circle(b, 50, 42, 26, 1)                                        # cranium
+    fill_poly(b, [(35, 56), (65, 56), (61, 73), (55, 80), (45, 80), (39, 73)], 1)  # jaw
+    fill_circle(b, 40, 45, 8, 0)                                         # left eye
+    fill_circle(b, 60, 45, 8, 0)                                         # right eye
+    fill_poly(b, [(50, 50), (46, 59), (54, 59)], 0)                      # nose
+    fill_poly(b, [(46, 14), (54, 14), (59, 30), (50, 39), (58, 51),      # bold jagged crack
+                  (49, 59), (42, 48), (51, 38), (41, 27)], 0)
+    return b
+
+
+def card_whirling_axe():
+    """Whirling Axe — a bearded axe with a motion arc."""
+    b = blank()
+    fill_poly(b, rect(46, 24, 52, 86), 1)                                # handle
+    fill_poly(b, [(52, 20), (70, 17), (82, 28), (80, 42), (66, 50),      # bearded blade (right)
+                  (52, 50), (52, 40), (62, 38), (62, 32), (52, 30)], 1)
+    fill_poly(b, rect(24, 30, 35, 35), 1)                                # motion ticks (left)
+    fill_poly(b, rect(20, 46, 32, 51), 1)
+    fill_poly(b, rect(24, 62, 35, 67), 1)
+    return b
+
+
+def card_haft_strike():
+    """Haft Strike — a war-hammer."""
+    b = blank()
+    fill_poly(b, rect(30, 12, 70, 34), 1)                                # head
+    fill_poly(b, rect(46, 34, 54, 88), 1)                                # haft
+    return b
+
+
+def card_shield_charge():
+    """Shield Charge — a shield driving forward."""
+    b = blank()
+    fill_poly(b, [(58, 14), (86, 23), (86, 45), (76, 68), (58, 82),      # shield (shifted right)
+                  (40, 68), (30, 45), (30, 23)], 1)
+    fill_poly(b, rect(6, 30, 26, 35), 1)                                 # motion lines
+    fill_poly(b, rect(2, 46, 24, 51), 1)
+    fill_poly(b, rect(6, 62, 26, 67), 1)
+    return b
+
+
+def card_twin_axes():
+    """Twin Axes — a pair of bearded axes facing outward."""
+    b = blank()
+    fill_poly(b, rect(38, 22, 43, 86), 1)                                # left handle
+    fill_poly(b, [(43, 26), (25, 23), (13, 34), (15, 48), (29, 56),      # left blade
+                  (43, 56), (43, 46), (33, 44), (33, 38), (43, 36)], 1)
+    fill_poly(b, rect(57, 22, 62, 86), 1)                                # right handle
+    fill_poly(b, [(62, 26), (80, 23), (92, 34), (90, 48), (76, 56),      # right blade
+                  (62, 56), (62, 46), (72, 44), (72, 38), (62, 36)], 1)
+    return b
+
+
+def card_rising_fury():
+    """Rising Fury — three rising flames."""
+    b = blank()
+
+    def flame(cx, base, top, w):
+        mid = (top + base) / 2.0
+        return [(cx, top), (cx + w, mid), (cx + w * 0.55, base - 5),
+                (cx, base), (cx - w * 0.55, base - 5), (cx - w, mid)]
+
+    fill_poly(b, flame(50, 88, 10, 17), 1)                               # tall central
+    fill_poly(b, flame(29, 88, 42, 12), 1)                               # left
+    fill_poly(b, flame(71, 88, 42, 12), 1)                               # right
+    return b
+
+
+def card_thors_wrath():
+    """Thor's Wrath — a lightning bolt."""
+    b = blank()
+    fill_poly(b, [(56, 8), (40, 48), (51, 48), (42, 92),
+                  (72, 42), (58, 42), (68, 8)], 1)
+    return b
+
+
+def card_unbowed():
+    """Unbowed — a standing banner."""
+    b = blank()
+    fill_poly(b, rect(47, 10, 51, 88), 1)                                # pole
+    fill_poly(b, [(51, 14), (84, 14), (75, 27), (84, 40), (51, 40)], 1)  # swallowtail pennant
+    return b
+
+
+def card_surge_of_rage():
+    """Surge of Rage — upward surge chevrons."""
+    b = blank()
+
+    def chevron(cy):
+        return [(26, cy), (50, cy - 24), (74, cy), (65, cy), (50, cy - 13), (35, cy)]
+
+    fill_poly(b, chevron(56), 1)
+    fill_poly(b, chevron(84), 1)
+    return b
+
+
+def card_berserkergang():
+    """Berserkergang — the Algiz rune (a stave with two raised arms)."""
+    b = blank()
+    fill_poly(b, rect(47, 18, 53, 88), 1)                                # stave
+    fill_poly(b, [(48, 50), (53, 46), (30, 14), (25, 18)], 1)            # left arm up
+    fill_poly(b, [(52, 50), (47, 46), (70, 14), (75, 18)], 1)            # right arm up
     return b
 
 
@@ -232,7 +334,20 @@ def main():
         bufs.append(buf)
         write_rgba(os.path.join(icons_dir, name + ".png"), buf)
         print("wrote", name + ".png")
-    card_order = [("card_attack", icon_sword), ("card_skill", icon_shield), ("card_power", icon_sparkle)]
+    card_order = [
+        ("card_hew", card_hew),
+        ("card_raise_shield", card_raise_shield),
+        ("card_skull_splitter", card_skull_splitter),
+        ("card_whirling_axe", card_whirling_axe),
+        ("card_haft_strike", card_haft_strike),
+        ("card_shield_charge", card_shield_charge),
+        ("card_twin_axes", card_twin_axes),
+        ("card_rising_fury", card_rising_fury),
+        ("card_thors_wrath", card_thors_wrath),
+        ("card_unbowed", card_unbowed),
+        ("card_surge_of_rage", card_surge_of_rage),
+        ("card_berserkergang", card_berserkergang),
+    ]
     for name, fn in card_order:
         buf = fn()
         bufs.append(buf)
