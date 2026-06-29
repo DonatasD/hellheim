@@ -102,8 +102,14 @@ pub fn spawn_card(
                 ImageNode { color: col, ..ImageNode::new(icon) },
             ));
             // name / text / hotkey
-            c.spawn(theme::text(font, spec.name, 14., theme::TEXT));
-            c.spawn(theme::text(font, spec.text, 11.5, theme::TEXT_DIM));
+            c.spawn((
+                theme::text(font, spec.name, 14., theme::TEXT),
+                TextLayout::new_with_justify(Justify::Center),
+            ));
+            c.spawn((
+                theme::text(font, spec.text, 11.5, theme::TEXT_DIM),
+                TextLayout::new_with_justify(Justify::Center),
+            ));
             c.spawn(theme::text(font, hot, 11., theme::TEXT_DIM));
             // affordability scrim (covers the whole card)
             c.spawn((
