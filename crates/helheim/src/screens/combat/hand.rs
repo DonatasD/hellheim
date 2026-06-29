@@ -43,7 +43,7 @@ pub const FLYOUT_SECS: f32 = 0.40;
 const CARD_W: f32 = 138.0;
 const CARD_H: f32 = 178.0;
 
-/// Build one Option-C card entity (type frame + icon + watermark + cost gem) and
+/// Build one Option-C card entity (type frame + icon + cost gem) and
 /// return it. Caller parents it into the hand row.
 pub fn spawn_card(
     commands: &mut Commands,
@@ -78,18 +78,6 @@ pub fn spawn_card(
             BackgroundColor(theme::PANEL),
         ))
         .with_children(|c| {
-            // faint watermark icon
-            c.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(14.),
-                    top: Val::Px(40.),
-                    width: Val::Px(108.),
-                    height: Val::Px(108.),
-                    ..default()
-                },
-                ImageNode { color: col.with_alpha(0.10), ..ImageNode::new(icon.clone()) },
-            ));
             // cost gem
             c.spawn((
                 Node {
