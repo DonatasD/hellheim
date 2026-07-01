@@ -282,7 +282,7 @@ fn sync_texts(ds: Res<DisplayState>, mut q: Query<(&Bind, &mut Text)>) {
         text.0 = match bind {
             Bind::Turn => format!("Turn {}", ds.turn),
             Bind::Piles => format!("Draw {}   Discard {}", ds.draw_count, ds.discard_count),
-            Bind::Energy => format!("Energy {}/3", ds.energy),
+            Bind::Energy => format!("Energy {}", ds.energy),
             Bind::Hp(TargetRef::Player) => format!("HP {}/{}", ds.player_hp, ds.player_max_hp),
             Bind::Hp(TargetRef::Enemy(i)) => match ds.enemies.get(*i) {
                 Some(e) if e.alive => format!("HP {}/{}", e.hp, e.max_hp),
