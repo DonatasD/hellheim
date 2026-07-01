@@ -152,6 +152,16 @@ pub fn apply_event(ds: &mut DisplayState, ev: &CombatEvent) {
                 }
             }
         },
+        CombatEvent::Healed { target, amount } => {
+            if target == TargetRef::Player {
+                ds.player_hp = (ds.player_hp + amount).min(ds.player_max_hp);
+            }
+        }
+        CombatEvent::HpLost { target, amount } => {
+            if target == TargetRef::Player {
+                ds.player_hp = ds.player_hp.saturating_sub(amount);
+            }
+        }
         CombatEvent::StatusApplied {
             target,
             status,
@@ -582,6 +592,19 @@ mod tests {
         assert_eq!(card_flow(&CombatEvent::HandDiscarded), Some(CardFlow::Discarded));
         assert_eq!(card_flow(&CombatEvent::DeckShuffled), None);
         assert_eq!(card_flow(&CombatEvent::CardAddedToDiscard { card: CardId::Hew }), None);
+    }
+
+    #[test]
+    fn heal_caps_at_max_and_losehp_ignores_block() {
+        let mut ds = fixture();
+        ds.player_hp = 70;
+        ds.player_max_hp = 80;
+        apply_event(&mut ds, &CombatEvent::Healed { target: TargetRef::Player, amount: 4 });
+        assert_eq!(ds.player_hp, 74);
+        apply_event(&mut ds, &CombatEvent::Healed { target: TargetRef::Player, amount: 999 });
+        assert_eq!(ds.player_hp, 80, "heal caps at max");
+        apply_event(&mut ds, &CombatEvent::HpLost { target: TargetRef::Player, amount: 3 });
+        assert_eq!(ds.player_hp, 77);
     }
 
     #[test]

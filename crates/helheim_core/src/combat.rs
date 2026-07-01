@@ -107,6 +107,14 @@ pub enum CombatEvent {
         blocked: u32,
         hp_lost: u32,
     },
+    Healed {
+        target: TargetRef,
+        amount: u32,
+    },
+    HpLost {
+        target: TargetRef,
+        amount: u32,
+    },
     StatusApplied {
         target: TargetRef,
         status: StatusKind,
