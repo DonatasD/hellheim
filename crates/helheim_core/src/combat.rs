@@ -595,7 +595,7 @@ impl CombatState {
                 }
             }
             Effect::Heal(n) => {
-                let healed = n.min(self.player.max_hp - self.player.hp);
+                let healed = n.min(self.player.max_hp.saturating_sub(self.player.hp));
                 self.player.hp += healed;
                 events.push(CombatEvent::Healed { target: TargetRef::Player, amount: healed });
             }
