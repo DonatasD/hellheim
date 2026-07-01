@@ -60,6 +60,7 @@ pub struct CardSpec {
     pub targeting: Targeting,
     pub effects: &'static [Effect],
     pub text: &'static str,
+    pub exhausts: bool,
 }
 
 macro_rules! spec {
@@ -72,6 +73,22 @@ macro_rules! spec {
             targeting: Targeting::$tgt,
             effects: $fx,
             text: $text,
+            exhausts: false,
+        }
+    };
+}
+
+macro_rules! spec_x {
+    ($id:ident, $name:literal, $kind:ident, $cost:literal, $tgt:ident, $fx:expr, $text:literal) => {
+        CardSpec {
+            id: CardId::$id,
+            name: $name,
+            kind: CardKind::$kind,
+            cost: $cost,
+            targeting: Targeting::$tgt,
+            effects: $fx,
+            text: $text,
+            exhausts: true,
         }
     };
 }
@@ -293,6 +310,12 @@ mod tests {
             deck.iter().filter(|c| **c == CardId::SkullSplitter).count(),
             1
         );
+    }
+
+    #[test]
+    fn existing_cards_do_not_exhaust() {
+        assert!(!CardId::Hew.spec().exhausts);
+        assert!(!CardId::Berserkergang.spec().exhausts);
     }
 
     #[test]

@@ -403,7 +403,9 @@ impl CombatState {
         if spec.kind == CardKind::Skill && self.over.is_none() {
             self.trigger_enrage(&mut events);
         }
-        if spec.kind != CardKind::Power {
+        if spec.exhausts {
+            self.exhaust.push(card);
+        } else if spec.kind != CardKind::Power {
             self.discard.push(card); // powers are consumed
         }
         Ok(events)

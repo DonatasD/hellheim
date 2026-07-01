@@ -110,7 +110,7 @@ pub fn apply_event(ds: &mut DisplayState, ev: &CombatEvent) {
             if hand_index < ds.hand.len() {
                 ds.hand.remove(hand_index);
             }
-            if card.spec().kind != CardKind::Power {
+            if card.spec().kind != CardKind::Power && !card.spec().exhausts {
                 ds.discard_count += 1;
             }
         }
