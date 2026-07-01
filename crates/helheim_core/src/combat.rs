@@ -1927,4 +1927,12 @@ mod tests {
         assert!(evs.iter().any(|e| matches!(e,
             CombatEvent::BlockGained { target: TargetRef::Player, amount: 4 })));
     }
+
+    #[test]
+    fn exhaust_card_goes_to_exhaust_pile_not_discard() {
+        let mut c = combat_vs(vec![enemy(Species::DraugrChanter, 50)], vec![CardId::IronWill]);
+        play(&mut c, 0, None).unwrap();
+        assert_eq!(c.exhaust, vec![CardId::IronWill]);
+        assert!(!c.discard.contains(&CardId::IronWill));
+    }
 }

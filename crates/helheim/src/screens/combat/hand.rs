@@ -304,6 +304,18 @@ pub struct CardAssets {
     surge_of_rage: Handle<Image>,
     berserkergang: Handle<Image>,
     thors_wrath: Handle<Image>,
+    rending_blow: Handle<Image>,
+    bulwark_bash: Handle<Image>,
+    sundering_axe: Handle<Image>,
+    reaver: Handle<Image>,
+    wrathful_cut: Handle<Image>,
+    war_frenzy: Handle<Image>,
+    sunder: Handle<Image>,
+    dread_roar: Handle<Image>,
+    blood_offering: Handle<Image>,
+    iron_will: Handle<Image>,
+    fury_of_the_bear: Handle<Image>,
+    iron_hide: Handle<Image>,
 }
 
 impl CardAssets {
@@ -321,6 +333,18 @@ impl CardAssets {
             surge_of_rage: server.load("icons/card_surge_of_rage.png"),
             berserkergang: server.load("icons/card_berserkergang.png"),
             thors_wrath: server.load("icons/card_thors_wrath.png"),
+            rending_blow: server.load("icons/card_rending_blow.png"),
+            bulwark_bash: server.load("icons/card_bulwark_bash.png"),
+            sundering_axe: server.load("icons/card_sundering_axe.png"),
+            reaver: server.load("icons/card_reaver.png"),
+            wrathful_cut: server.load("icons/card_wrathful_cut.png"),
+            war_frenzy: server.load("icons/card_war_frenzy.png"),
+            sunder: server.load("icons/card_sunder.png"),
+            dread_roar: server.load("icons/card_dread_roar.png"),
+            blood_offering: server.load("icons/card_blood_offering.png"),
+            iron_will: server.load("icons/card_iron_will.png"),
+            fury_of_the_bear: server.load("icons/card_fury_of_the_bear.png"),
+            iron_hide: server.load("icons/card_iron_hide.png"),
         }
     }
 
@@ -340,6 +364,18 @@ impl CardAssets {
             CardId::SurgeOfRage => self.surge_of_rage.clone(),
             CardId::Berserkergang => self.berserkergang.clone(),
             CardId::ThorsWrath => self.thors_wrath.clone(),
+            CardId::RendingBlow => self.rending_blow.clone(),
+            CardId::BulwarkBash => self.bulwark_bash.clone(),
+            CardId::SunderingAxe => self.sundering_axe.clone(),
+            CardId::Reaver => self.reaver.clone(),
+            CardId::WrathfulCut => self.wrathful_cut.clone(),
+            CardId::WarFrenzy => self.war_frenzy.clone(),
+            CardId::Sunder => self.sunder.clone(),
+            CardId::DreadRoar => self.dread_roar.clone(),
+            CardId::BloodOffering => self.blood_offering.clone(),
+            CardId::IronWill => self.iron_will.clone(),
+            CardId::FuryOfTheBear => self.fury_of_the_bear.clone(),
+            CardId::IronHide => self.iron_hide.clone(),
         }
     }
 }

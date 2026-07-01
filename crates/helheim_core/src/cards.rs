@@ -14,6 +14,18 @@ pub enum CardId {
     SurgeOfRage,   // Flex
     Berserkergang, // Inflame
     ThorsWrath,    // Thunderclap
+    RendingBlow,
+    BulwarkBash,
+    SunderingAxe,
+    Reaver,
+    WrathfulCut,
+    WarFrenzy,
+    Sunder,
+    DreadRoar,
+    BloodOffering,
+    IronWill,
+    FuryOfTheBear,
+    IronHide,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -93,7 +105,7 @@ macro_rules! spec_x {
     };
 }
 
-static SPECS: [CardSpec; 12] = [
+static SPECS: [CardSpec; 24] = [
     spec!(
         Hew,
         "Hew",
@@ -202,6 +214,30 @@ static SPECS: [CardSpec; 12] = [
         &[Effect::DamageAll(4), Effect::ApplyVulnerableAll(1)],
         "Deal 4 damage to ALL enemies. Apply 1 Vulnerable to ALL enemies."
     ),
+    spec!(RendingBlow, "Rending Blow", Attack, 2, SingleEnemy,
+        &[Effect::Damage(9), Effect::ApplyWeak(2)], "Deal 9 damage. Apply 2 Weak."),
+    spec!(BulwarkBash, "Bulwark Bash", Attack, 1, SingleEnemy,
+        &[Effect::DamageEqualToBlock], "Deal damage equal to your Block."),
+    spec_x!(SunderingAxe, "Sundering Axe", Attack, 2, SingleEnemy,
+        &[Effect::Damage(16)], "Deal 16 damage. Exhaust."),
+    spec!(Reaver, "Reaver", Attack, 2, AllEnemies,
+        &[Effect::DamageAll(5), Effect::Heal(4)], "Deal 5 damage to ALL enemies. Heal 4."),
+    spec!(WrathfulCut, "Wrathful Cut", Attack, 1, SingleEnemy,
+        &[Effect::Damage(7), Effect::GainTempStrength(2)], "Deal 7 damage. Gain 2 Strength this turn."),
+    spec!(WarFrenzy, "War Frenzy", Skill, 1, None,
+        &[Effect::Draw(2)], "Draw 2 cards."),
+    spec!(Sunder, "Sunder", Skill, 1, SingleEnemy,
+        &[Effect::ApplyWeak(2)], "Apply 2 Weak."),
+    spec_x!(DreadRoar, "Dread Roar", Skill, 0, AllEnemies,
+        &[Effect::ApplyWeakAll(1)], "Apply 1 Weak to ALL enemies. Exhaust."),
+    spec_x!(BloodOffering, "Blood Offering", Skill, 0, None,
+        &[Effect::LoseHp(3), Effect::GainEnergy(2)], "Lose 3 HP. Gain 2 Energy. Exhaust."),
+    spec_x!(IronWill, "Iron Will", Skill, 1, None,
+        &[Effect::Block(10)], "Gain 10 Block. Exhaust."),
+    spec!(FuryOfTheBear, "Fury of the Bear", Power, 3, None,
+        &[Effect::GainRitual(2)], "At the start of each turn, gain 2 Strength."),
+    spec!(IronHide, "Iron Hide", Power, 1, None,
+        &[Effect::GainMetallicize(4)], "At the end of each turn, gain 4 Block."),
 ];
 
 impl CardId {
@@ -222,7 +258,7 @@ pub fn starter_deck() -> Vec<CardId> {
     deck
 }
 
-pub const REWARD_POOL: [CardId; 9] = [
+pub const REWARD_POOL: [CardId; 21] = [
     CardId::WhirlingAxe,
     CardId::HaftStrike,
     CardId::Unbowed,
@@ -232,6 +268,18 @@ pub const REWARD_POOL: [CardId; 9] = [
     CardId::SurgeOfRage,
     CardId::Berserkergang,
     CardId::ThorsWrath,
+    CardId::RendingBlow,
+    CardId::BulwarkBash,
+    CardId::SunderingAxe,
+    CardId::Reaver,
+    CardId::WrathfulCut,
+    CardId::WarFrenzy,
+    CardId::Sunder,
+    CardId::DreadRoar,
+    CardId::BloodOffering,
+    CardId::IronWill,
+    CardId::FuryOfTheBear,
+    CardId::IronHide,
 ];
 
 #[cfg(test)]
@@ -319,14 +367,24 @@ mod tests {
     }
 
     #[test]
-    fn reward_pool_is_the_9_non_starter_designs() {
-        assert_eq!(REWARD_POOL.len(), 9);
+    fn reward_pool_is_21_and_excludes_starters() {
+        assert_eq!(REWARD_POOL.len(), 21);
         for starter in [CardId::Hew, CardId::RaiseShield, CardId::SkullSplitter] {
             assert!(!REWARD_POOL.contains(&starter));
         }
         let mut unique = REWARD_POOL.to_vec();
-        unique.sort_unstable_by_key(|c| *c as usize);
+        unique.sort_by_key(|c| format!("{c:?}"));
         unique.dedup();
-        assert_eq!(unique.len(), 9);
+        assert_eq!(unique.len(), 21, "no duplicates");
+    }
+
+    #[test]
+    fn new_card_specs_are_correct() {
+        let b = CardId::BulwarkBash.spec();
+        assert_eq!((b.kind, b.cost, b.exhausts), (CardKind::Attack, 1, false));
+        let s = CardId::SunderingAxe.spec();
+        assert_eq!((s.cost, s.exhausts), (2, true));
+        assert_eq!(CardId::FuryOfTheBear.spec().kind, CardKind::Power);
+        assert_eq!(CardId::DreadRoar.spec().targeting, Targeting::AllEnemies);
     }
 }
