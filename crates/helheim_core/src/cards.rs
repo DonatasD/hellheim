@@ -47,6 +47,8 @@ pub enum Effect {
     GainTempStrength(i32),
     Draw(u32),
     AddCopyToDiscard,
+    GainRitual(u32),
+    GainMetallicize(u32),
 }
 
 #[derive(Debug)]

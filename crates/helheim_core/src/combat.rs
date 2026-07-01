@@ -606,6 +606,22 @@ impl CombatState {
                 self.player.energy += n;
                 events.push(CombatEvent::EnergySet { energy: self.player.energy });
             }
+            Effect::GainRitual(n) => {
+                self.player.statuses.ritual += n;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Ritual,
+                    amount: n as i32,
+                });
+            }
+            Effect::GainMetallicize(n) => {
+                self.player.statuses.metallicize += n;
+                events.push(CombatEvent::StatusApplied {
+                    target: TargetRef::Player,
+                    status: StatusKind::Metallicize,
+                    amount: n as i32,
+                });
+            }
         }
     }
 
@@ -630,6 +646,13 @@ impl CombatState {
                 target: TargetRef::Player,
                 status: StatusKind::StrengthDown,
             });
+        }
+
+        // Metallicize: gain Block at end of the player's turn (protects vs the enemy turn).
+        if self.player.statuses.metallicize > 0 {
+            let n = self.player.statuses.metallicize;
+            self.player.block += n;
+            events.push(CombatEvent::BlockGained { target: TargetRef::Player, amount: n });
         }
 
         // 3. Player duration tick.
@@ -699,6 +722,15 @@ impl CombatState {
             energy: ENERGY_PER_TURN,
         });
         events.push(CombatEvent::TurnStarted { turn: self.turn });
+        if self.player.statuses.ritual > 0 {
+            let gain = self.player.statuses.ritual as i32;
+            self.player.statuses.strength += gain;
+            events.push(CombatEvent::StatusApplied {
+                target: TargetRef::Player,
+                status: StatusKind::Strength,
+                amount: gain,
+            });
+        }
         for _ in 0..DRAW_PER_TURN {
             self.draw_one(rng, &mut events);
         }
@@ -1872,5 +1904,25 @@ mod tests {
         c.player.energy = 1;
         c.run_effect(&mut RunRng::new(0), Effect::GainEnergy(2), CardId::Hew, None, &mut vec![]);
         assert_eq!(c.player.energy, 3);
+    }
+
+    #[test]
+    fn player_ritual_grants_strength_at_start_of_next_turn() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.run_effect(&mut RunRng::new(0), Effect::GainRitual(2), CardId::Hew, None, &mut vec![]);
+        let before = c.player.statuses.strength;
+        let _ = c.end_turn(&mut RunRng::new(0)); // advances to the next player turn
+        assert_eq!(c.player.statuses.strength, before + 2, "gains Strength at the new turn");
+    }
+
+    #[test]
+    fn metallicize_grants_block_at_end_of_player_turn() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.run_effect(&mut RunRng::new(0), Effect::GainMetallicize(4), CardId::Hew, None, &mut vec![]);
+        let evs = c.end_turn(&mut RunRng::new(0));
+        assert!(evs.iter().any(|e| matches!(e,
+            CombatEvent::BlockGained { target: TargetRef::Player, amount: 4 })));
     }
 }
