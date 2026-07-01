@@ -1,10 +1,16 @@
 //! Combat hand: card visuals, the event-sourced reconcile, and animations.
 use bevy::prelude::*;
-use helheim_core::cards::{CardId, CardKind};
+use helheim_core::cards::{CardId, CardKind, Effect};
+use helheim_core::combat::attack_damage;
+use helheim_core::statuses::Statuses;
 
 use super::HandRow;
 use crate::anim::DisplayState;
 use crate::theme::{self, UiFont};
+
+/// Damage badge colours: green when your buffs raise it, orange when lowered.
+const DMG_BUFFED: Color = Color::srgb(0.45, 0.82, 0.45);
+const DMG_NERFED: Color = Color::srgb(0.90, 0.55, 0.25);
 
 /// Per-type accent: Attack red, Skill blue, Power gold.
 pub fn kind_color(kind: CardKind) -> Color {
@@ -12,6 +18,67 @@ pub fn kind_color(kind: CardKind) -> Color {
         CardKind::Attack => theme::ACCENT,
         CardKind::Skill => theme::BLOCK_COLOR,
         CardKind::Power => theme::ENERGY_COLOR,
+    }
+}
+
+/// A card's attack for display: `(per_hit_damage, hits)`, or `None` if it deals
+/// no direct damage. Follows the engine's resolution order, so Strength a card
+/// grants to *itself* after its hit (e.g. Wrathful Cut) is not counted. `block`
+/// feeds Bulwark-Bash-style `DamageEqualToBlock`; `target_vulnerable` adds ×1.5.
+/// (Cards with differing per-hit values don't exist yet; such a card would show
+/// only its last hit's value.)
+pub(crate) fn card_attack_preview(
+    card: CardId,
+    player: &Statuses,
+    block: u32,
+    target_vulnerable: bool,
+) -> Option<(u32, u32)> {
+    let weak = player.weak > 0;
+    let mut per_hit = 0;
+    let mut hits = 0;
+    for eff in card.spec().effects {
+        match eff {
+            Effect::Damage(b) | Effect::DamageAll(b) => {
+                per_hit = attack_damage(*b, player.strength, weak, target_vulnerable);
+                hits += 1;
+            }
+            // Body Slam: damage equals current Block; Strength does not add.
+            Effect::DamageEqualToBlock => {
+                per_hit = attack_damage(block, 0, weak, target_vulnerable);
+                hits += 1;
+            }
+            _ => {}
+        }
+    }
+    (hits > 0).then_some((per_hit, hits))
+}
+
+/// The card-face damage badge: effective per-hit damage, coloured, or an empty
+/// string when unmodified (the printed prose is then already correct).
+fn card_damage_label(card: CardId, ds: &DisplayState) -> (String, Color) {
+    let Some((eff, hits)) = card_attack_preview(card, &ds.statuses, ds.player_block, false) else {
+        return (String::new(), theme::TEXT);
+    };
+    let label = if hits > 1 { format!("{eff}x{hits}") } else { format!("{eff}") };
+    // Bulwark Bash has no printed number ("equal to your Block") — always show it.
+    let block_scaled = card
+        .spec()
+        .effects
+        .iter()
+        .any(|e| matches!(e, Effect::DamageEqualToBlock));
+    if block_scaled {
+        let col = if ds.statuses.weak > 0 { DMG_NERFED } else { theme::TEXT };
+        return (label, col);
+    }
+    let base = card_attack_preview(card, &Statuses::default(), ds.player_block, false)
+        .map(|(d, _)| d)
+        .unwrap_or(eff);
+    if eff > base {
+        (label, DMG_BUFFED)
+    } else if eff < base {
+        (label, DMG_NERFED)
+    } else {
+        (String::new(), theme::TEXT) // unmodified: prose already reads correctly
     }
 }
 
@@ -24,6 +91,11 @@ pub struct Card {
 /// Full-card dark overlay; alpha rises when the card is unaffordable.
 #[derive(Component)]
 pub struct CardScrim;
+
+/// Card-face damage badge; `refresh_card_damage` fills it with the effective
+/// (Strength/Weak-adjusted) damage for this card.
+#[derive(Component)]
+pub struct CardDamage(pub CardId);
 
 /// Draw-in animation in progress.
 #[derive(Component)]
@@ -96,6 +168,17 @@ pub fn spawn_card(
             .with_children(|g| {
                 g.spawn(theme::text(font, format!("{}", spec.cost), 14., Color::srgb(0.06, 0.06, 0.08)));
             });
+            // effective-damage badge (top-right); filled by refresh_card_damage
+            c.spawn((
+                CardDamage(card),
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(9.),
+                    top: Val::Px(8.),
+                    ..default()
+                },
+                theme::text(font, "", 17., theme::TEXT),
+            ));
             // big type icon
             c.spawn((
                 Node { width: Val::Px(50.), height: Val::Px(50.), margin: UiRect::top(Val::Px(16.)), ..default() },
@@ -190,6 +273,24 @@ pub fn refresh_affordability(
             if let Ok(mut bg) = scrims.get_mut(child) {
                 bg.0 = bg.0.with_alpha(if unaffordable { 0.5 } else { 0.0 });
             }
+        }
+    }
+}
+
+/// Fill each card's damage badge with the effective (Strength/Weak/Block-adjusted)
+/// damage. Runs every frame but writes only on change, so a freshly drawn card is
+/// populated without depending on `DisplayState` change detection.
+pub fn refresh_card_damage(
+    ds: Res<DisplayState>,
+    mut badges: Query<(&CardDamage, &mut Text, &mut TextColor)>,
+) {
+    for (cd, mut text, mut color) in &mut badges {
+        let (label, col) = card_damage_label(cd.0, &ds);
+        if text.0 != label {
+            text.0 = label;
+        }
+        if color.0 != col {
+            color.0 = col;
         }
     }
 }
@@ -389,6 +490,37 @@ mod tests {
         assert_eq!(kind_color(CardKind::Attack), theme::ACCENT);
         assert_ne!(kind_color(CardKind::Attack), kind_color(CardKind::Skill));
         assert_ne!(kind_color(CardKind::Skill), kind_color(CardKind::Power));
+    }
+
+    fn stat(strength: i32, weak: u32) -> Statuses {
+        Statuses { strength, weak, ..Default::default() }
+    }
+
+    #[test]
+    fn preview_scales_with_strength_and_vulnerable() {
+        // Rending Blow deals Damage(9).
+        assert_eq!(card_attack_preview(CardId::RendingBlow, &stat(0, 0), 0, false), Some((9, 1)));
+        assert_eq!(card_attack_preview(CardId::RendingBlow, &stat(2, 0), 0, false), Some((11, 1)));
+        assert_eq!(card_attack_preview(CardId::RendingBlow, &stat(0, 0), 0, true), Some((13, 1))); // 9*1.5
+        assert_eq!(card_attack_preview(CardId::RendingBlow, &stat(2, 0), 0, true), Some((16, 1))); // 11*1.5 floored
+    }
+
+    #[test]
+    fn preview_counts_multihit_and_skips_nondamage() {
+        assert_eq!(card_attack_preview(CardId::TwinAxes, &stat(0, 0), 0, false), Some((5, 2)));
+        assert_eq!(card_attack_preview(CardId::WarFrenzy, &stat(0, 0), 0, false), None); // Draw(2)
+    }
+
+    #[test]
+    fn preview_body_slam_uses_block_and_ignores_strength() {
+        assert_eq!(card_attack_preview(CardId::BulwarkBash, &stat(3, 0), 10, false), Some((10, 1)));
+        assert_eq!(card_attack_preview(CardId::BulwarkBash, &stat(0, 0), 10, true), Some((15, 1))); // 10*1.5
+    }
+
+    #[test]
+    fn preview_weak_reduces_damage() {
+        // 9 under player Weak -> floor(9 * 3/4) = 6.
+        assert_eq!(card_attack_preview(CardId::RendingBlow, &stat(0, 1), 0, false), Some((6, 1)));
     }
 
     /// Regression: when a full hand is dealt in a single frame, each drawn card

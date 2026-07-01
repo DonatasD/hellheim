@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use helheim_core::cards::Targeting;
+use helheim_core::cards::{CardId, Targeting};
 use helheim_core::combat::{Action, IntentKind, TargetRef};
 use helheim_core::run::Stage;
 use helheim_core::statuses::Statuses;
@@ -26,7 +26,7 @@ impl Plugin for CombatScreenPlugin {
                     (card_click, enemy_click, end_turn_button, keyboard)
                         .run_if(in_state(AppState::Combat))
                         .run_if(queue_empty),
-                    (hand::reconcile_hand, hand::animate_enter, hand::animate_flyout, hand::refresh_affordability, hand::hover_cards, hand::pulse_pending.after(hand::hover_cards), sync_texts, highlight_enemies, post_combat)
+                    (hand::reconcile_hand, hand::animate_enter, hand::animate_flyout, hand::refresh_affordability, hand::refresh_card_damage, hand::hover_cards, hand::pulse_pending.after(hand::hover_cards), sync_texts, highlight_enemies, refresh_damage_preview, post_combat)
                         .run_if(in_state(AppState::Combat)),
                 ),
             );
@@ -61,6 +61,10 @@ pub(crate) struct HandRow;
 
 #[derive(Component)]
 struct EndTurnButton;
+
+/// Per-enemy incoming-damage preview, shown while an attack card is active.
+#[derive(Component)]
+struct EnemyDamagePreview(usize);
 
 fn enter_combat(
     mut commands: Commands,
@@ -180,6 +184,10 @@ fn spawn_combat_ui(commands: &mut Commands, font: &UiFont, ds: &DisplayState) {
                                 p.spawn((
                                     Bind::Intent(i),
                                     theme::text(font, "", 18., theme::ENERGY_COLOR),
+                                ));
+                                p.spawn((
+                                    EnemyDamagePreview(i),
+                                    theme::text(font, "", 16., theme::TEXT),
                                 ));
                                 p.spawn((
                                     Bind::Hp(TargetRef::Enemy(i)),
@@ -329,6 +337,52 @@ fn highlight_enemies(
         } else {
             theme::PANEL
         });
+    }
+}
+
+/// Orange when the enemy is Vulnerable (the shown damage is boosted).
+const PREVIEW_VULN: Color = Color::srgb(0.96, 0.52, 0.28);
+
+/// While a damage card is active (being aimed, or hovered in hand), show on each
+/// living enemy the effective damage it would take — boosted and coloured when it
+/// is Vulnerable. Cleared when no attack card is active.
+fn refresh_damage_preview(
+    ds: Res<DisplayState>,
+    pending: Res<PendingCard>,
+    cards: Query<(&Interaction, &hand::Card)>,
+    mut previews: Query<(&EnemyDamagePreview, &mut Text, &mut TextColor)>,
+) {
+    // The active card: the one being aimed, else whichever is hovered in hand.
+    let mut active: Option<CardId> = pending.0.and_then(|slot| ds.hand.get(slot).copied());
+    if active.is_none() {
+        for (interaction, card) in &cards {
+            if matches!(interaction, Interaction::Hovered | Interaction::Pressed) {
+                active = Some(card.card);
+                break;
+            }
+        }
+    }
+    for (preview, mut text, mut color) in &mut previews {
+        let out = active.and_then(|card| {
+            let e = ds.enemies.get(preview.0)?;
+            if !e.alive {
+                return None;
+            }
+            let vuln = e.statuses.vulnerable > 0;
+            let (d, hits) = hand::card_attack_preview(card, &ds.statuses, ds.player_block, vuln)?;
+            let label = if hits > 1 { format!("takes {d}x{hits}") } else { format!("takes {d}") };
+            Some((label, vuln))
+        });
+        let (label, col) = match out {
+            Some((label, vuln)) => (label, if vuln { PREVIEW_VULN } else { theme::TEXT }),
+            None => (String::new(), theme::TEXT),
+        };
+        if text.0 != label {
+            text.0 = label;
+        }
+        if color.0 != col {
+            color.0 = col;
+        }
     }
 }
 

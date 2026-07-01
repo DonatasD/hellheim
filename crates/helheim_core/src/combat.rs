@@ -572,6 +572,12 @@ impl CombatState {
                             status: StatusKind::Weak,
                             amount: n as i32,
                         });
+                        // Weak lowers the enemy's outgoing damage: re-emit its
+                        // intent so the displayed number isn't stale.
+                        events.push(CombatEvent::IntentSet {
+                            index: t,
+                            intent: self.intent_of(t),
+                        });
                     }
                 }
             }
@@ -583,6 +589,11 @@ impl CombatState {
                         target: TargetRef::Enemy(i),
                         status: StatusKind::Weak,
                         amount: n as i32,
+                    });
+                    // Refresh the shown intent to reflect the new Weak.
+                    events.push(CombatEvent::IntentSet {
+                        index: i,
+                        intent: self.intent_of(i),
                     });
                 }
             }
@@ -1874,6 +1885,41 @@ mod tests {
         let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
         c.run_effect(&mut RunRng::new(0), Effect::ApplyWeak(2), CardId::Hew, Some(0), &mut vec![]);
         assert_eq!(c.enemies[0].statuses.weak, 2);
+    }
+
+    #[test]
+    fn applying_weak_reemits_the_enemy_intent_with_reduced_damage() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.enemies[0].next_move = EnemyMove::Chomp; // base 11
+        let mut events = vec![];
+        c.run_effect(&mut RunRng::new(0), Effect::ApplyWeak(1), CardId::Hew, Some(0), &mut events);
+        // Chomp 11 under Weak -> floor(11 * 3/4) = 8; the display must refresh.
+        assert!(events.contains(&CombatEvent::IntentSet {
+            index: 0,
+            intent: IntentKind::Attack { damage: 8, hits: 1 },
+        }));
+    }
+
+    #[test]
+    fn applying_weak_to_all_reemits_every_enemy_intent() {
+        let mut c = combat_vs(
+            vec![enemy(Species::GraveWolf, 45), enemy(Species::GraveWolf, 45)],
+            vec![CardId::Hew],
+        );
+        c.enemies[0].next_move = EnemyMove::Chomp;
+        c.enemies[1].next_move = EnemyMove::Chomp;
+        let mut events = vec![];
+        c.run_effect(&mut RunRng::new(0), Effect::ApplyWeakAll(1), CardId::Hew, None, &mut events);
+        for i in 0..2 {
+            assert!(
+                events.contains(&CombatEvent::IntentSet {
+                    index: i,
+                    intent: IntentKind::Attack { damage: 8, hits: 1 },
+                }),
+                "enemy {i} intent should refresh to the weakened value"
+            );
+        }
     }
 
     #[test]
