@@ -411,9 +411,14 @@ impl CombatState {
 
     /// Player attacks one enemy: pipeline, soak, Curl Up, death, victory.
     fn attack_enemy(&mut self, i: usize, base: u32, events: &mut Vec<CombatEvent>) {
+        self.attack_enemy_str(i, base, self.player.statuses.strength, events);
+    }
+
+    /// Attack with an explicit Strength (Body Slam passes 0).
+    fn attack_enemy_str(&mut self, i: usize, base: u32, strength: i32, events: &mut Vec<CombatEvent>) {
         let dmg = attack_damage(
             base,
-            self.player.statuses.strength,
+            strength,
             self.player.statuses.weak > 0,
             self.enemies[i].statuses.vulnerable > 0,
         );
@@ -555,6 +560,51 @@ impl CombatState {
             Effect::AddCopyToDiscard => {
                 self.discard.push(card);
                 events.push(CombatEvent::CardAddedToDiscard { card });
+            }
+            Effect::ApplyWeak(n) => {
+                if let Some(t) = target {
+                    if self.enemies[t].alive() {
+                        self.enemies[t].statuses.weak += n;
+                        events.push(CombatEvent::StatusApplied {
+                            target: TargetRef::Enemy(t),
+                            status: StatusKind::Weak,
+                            amount: n as i32,
+                        });
+                    }
+                }
+            }
+            Effect::ApplyWeakAll(n) => {
+                let targets: Vec<usize> = self.living().collect();
+                for i in targets {
+                    self.enemies[i].statuses.weak += n;
+                    events.push(CombatEvent::StatusApplied {
+                        target: TargetRef::Enemy(i),
+                        status: StatusKind::Weak,
+                        amount: n as i32,
+                    });
+                }
+            }
+            Effect::DamageEqualToBlock => {
+                if let Some(t) = target {
+                    if self.enemies[t].alive() {
+                        let base = self.player.block;
+                        self.attack_enemy_str(t, base, 0, events);
+                    }
+                }
+            }
+            Effect::Heal(n) => {
+                let healed = n.min(self.player.max_hp - self.player.hp);
+                self.player.hp += healed;
+                events.push(CombatEvent::Healed { target: TargetRef::Player, amount: healed });
+            }
+            Effect::LoseHp(n) => {
+                let lost = n.min(self.player.hp);
+                self.player.hp -= lost;
+                events.push(CombatEvent::HpLost { target: TargetRef::Player, amount: lost });
+            }
+            Effect::GainEnergy(n) => {
+                self.player.energy += n;
+                events.push(CombatEvent::EnergySet { energy: self.player.energy });
             }
         }
     }
@@ -907,7 +957,7 @@ pub fn soak(block: &mut u32, hp: &mut u32, amount: u32) -> DamageOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{starter_deck, CardId};
+    use crate::cards::{starter_deck, CardId, Effect};
     use crate::enemies::{EnemyMove, Species};
     use crate::rng::RunRng;
     use crate::statuses::Statuses;
@@ -1782,5 +1832,45 @@ mod tests {
             c.intent_of(0),
             IntentKind::Attack { damage: 8, hits: 2 }
         ));
+    }
+
+    #[test]
+    fn apply_weak_sets_enemy_weak() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.run_effect(&mut RunRng::new(0), Effect::ApplyWeak(2), CardId::Hew, Some(0), &mut vec![]);
+        assert_eq!(c.enemies[0].statuses.weak, 2);
+    }
+
+    #[test]
+    fn damage_equal_to_block_uses_block_not_strength() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.player.block = 7;
+        c.player.statuses.strength = 3; // must NOT add
+        let before = c.enemies[0].hp;
+        c.run_effect(&mut RunRng::new(0), Effect::DamageEqualToBlock, CardId::Hew, Some(0), &mut vec![]);
+        assert_eq!(before - c.enemies[0].hp, 7, "deals Block (7), Strength ignored");
+    }
+
+    #[test]
+    fn heal_caps_and_losehp_ignores_block() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.player.hp = c.player.max_hp - 2;
+        c.run_effect(&mut RunRng::new(0), Effect::Heal(10), CardId::Hew, None, &mut vec![]);
+        assert_eq!(c.player.hp, c.player.max_hp);
+        c.player.block = 50;
+        c.run_effect(&mut RunRng::new(0), Effect::LoseHp(5), CardId::Hew, None, &mut vec![]);
+        assert_eq!(c.player.hp, c.player.max_hp - 5, "LoseHp bypasses Block");
+    }
+
+    #[test]
+    fn gain_energy_adds_energy() {
+        let mut rng = RunRng::new(0);
+        let (mut c, _) = CombatState::new(&mut rng, &starter_deck(), 80, 80, &[Species::GraveWolf]);
+        c.player.energy = 1;
+        c.run_effect(&mut RunRng::new(0), Effect::GainEnergy(2), CardId::Hew, None, &mut vec![]);
+        assert_eq!(c.player.energy, 3);
     }
 }
