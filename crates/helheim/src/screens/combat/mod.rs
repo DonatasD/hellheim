@@ -248,6 +248,9 @@ fn status_line(s: &Statuses) -> String {
     if s.strength_down > 0 {
         parts.push(format!("Str Down {}", s.strength_down));
     }
+    if s.metallicize > 0 {
+        parts.push(format!("Metallicize {}", s.metallicize));
+    }
     parts.join("  ")
 }
 

@@ -7,6 +7,7 @@ pub enum StatusKind {
     Enrage,
     CurlUp,
     StrengthDown,
+    Metallicize,
 }
 
 /// One creature's statuses. Typed fields (not a map): the Phase 1 set is
@@ -29,6 +30,8 @@ pub struct Statuses {
     pub curl_up: Option<u32>,
     /// Loses this much Strength at end of own turn, then clears (Surge of Rage).
     pub strength_down: u32,
+    /// Gains this much Block at the end of the player's turn. Permanent (no tick).
+    pub metallicize: u32,
 }
 
 impl Statuses {
@@ -71,6 +74,14 @@ mod tests {
         s.vulnerable += 2;
         s.vulnerable += 1;
         assert_eq!(s.vulnerable, 3);
+    }
+
+    #[test]
+    fn metallicize_defaults_zero_and_does_not_tick() {
+        let mut s = Statuses { metallicize: 4, vulnerable: 1, ..Default::default() };
+        let _ = s.tick_durations();
+        assert_eq!(s.metallicize, 4, "metallicize is permanent, never ticks");
+        assert_eq!(Statuses::default().metallicize, 0);
     }
 
     #[test]

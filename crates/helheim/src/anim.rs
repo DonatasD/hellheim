@@ -208,6 +208,7 @@ fn bump_status(s: &mut Statuses, kind: StatusKind, amount: i32) {
         StatusKind::Enrage => s.enrage += amount.max(0) as u32,
         StatusKind::CurlUp => s.curl_up = Some(amount.max(0) as u32),
         StatusKind::StrengthDown => s.strength_down += amount.max(0) as u32,
+        StatusKind::Metallicize => s.metallicize += amount.max(0) as u32,
     }
 }
 
@@ -228,6 +229,7 @@ fn clear_status(s: &mut Statuses, kind: StatusKind) {
         StatusKind::Enrage => s.enrage = 0,
         StatusKind::CurlUp => s.curl_up = None,
         StatusKind::StrengthDown => s.strength_down = 0,
+        StatusKind::Metallicize => s.metallicize = 0,
     }
 }
 
