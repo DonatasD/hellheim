@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use helheim_core::cards::{CardId, Targeting};
-use helheim_core::combat::{Action, IntentKind, TargetRef};
+use helheim_core::combat::{Action, ENERGY_PER_TURN, IntentKind, TargetRef};
 use helheim_core::run::Stage;
 use helheim_core::statuses::Statuses;
 
@@ -282,7 +282,7 @@ fn sync_texts(ds: Res<DisplayState>, mut q: Query<(&Bind, &mut Text)>) {
         text.0 = match bind {
             Bind::Turn => format!("Turn {}", ds.turn),
             Bind::Piles => format!("Draw {}   Discard {}", ds.draw_count, ds.discard_count),
-            Bind::Energy => format!("Energy {}", ds.energy),
+            Bind::Energy => format!("Energy {}/{}", ds.energy, ENERGY_PER_TURN),
             Bind::Hp(TargetRef::Player) => format!("HP {}/{}", ds.player_hp, ds.player_max_hp),
             Bind::Hp(TargetRef::Enemy(i)) => match ds.enemies.get(*i) {
                 Some(e) if e.alive => format!("HP {}/{}", e.hp, e.max_hp),
